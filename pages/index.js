@@ -17,37 +17,39 @@ export default function CRM() {
     if (!router.isReady) return
 
     const init = async () => {
-      // Проверяем, есть ли токен в URL (передан из банка)
       const urlToken = router.query.token
 
       if (urlToken) {
-        // Устанавливаем сессию из токена
+        console.log('Токен получен из URL, устанавливаем сессию...')
         const { data: { user: currentUser }, error } = await supabase.auth.setSession({
           access_token: urlToken,
           refresh_token: '',
         })
 
         if (error || !currentUser) {
+          console.error('Ошибка установки сессии:', error)
           setNeedsLogin(true)
           setLoading(false)
           return
         }
 
+        console.log('Сессия установлена, пользователь:', currentUser.email)
         setUser(currentUser)
         await loadUserData(currentUser.id)
-        // Очищаем токен из URL, чтобы не мешал
-        router.replace('/')
+        router.replace('/') // убираем токен из URL
         return
       }
 
-      // Токена нет – проверяем, есть ли уже активная сессия
-      const { data: { user: existingUser } } = await supabase.auth.getUser()
-      if (!existingUser) {
+      // Токена нет – проверяем существующую сессию
+      const { data: { user: existingUser }, error: getUserError } = await supabase.auth.getUser()
+      if (getUserError || !existingUser) {
+        console.log('Нет активной сессии')
         setNeedsLogin(true)
         setLoading(false)
         return
       }
 
+      console.log('Найдена существующая сессия:', existingUser.email)
       setUser(existingUser)
       await loadUserData(existingUser.id)
       setLoading(false)
@@ -73,7 +75,7 @@ export default function CRM() {
       .single()
     if (balanceData) setBalance(balanceData.balance)
 
-    // Задания CRM (автоматические, in_progress)
+    // Задания CRM
     const { data: taskAssignments } = await supabase
       .from('task_assignments')
       .select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)')
@@ -82,7 +84,7 @@ export default function CRM() {
       .eq('tasks.task_type', 'auto_crm')
     if (taskAssignments) setTasks(taskAssignments)
 
-    // Звонки из localStorage
+    // Звонки
     const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
     if (savedCalls) setCalls(parseInt(savedCalls))
 
@@ -158,7 +160,6 @@ export default function CRM() {
     )
   }
 
-  // Если нужен вход – показываем статичную страницу с кнопкой
   if (needsLogin) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#E8F4FD' }}>
