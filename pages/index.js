@@ -1,9 +1,68 @@
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 import Head from 'next/head'
+import { supabase, getAccessToken } from '../lib/supabaseClient'
 
 export default function CRM() {
+  const router = useRouter()
+  const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [balance, setBalance] = useState(0)
+  const [tasks, setTasks] = useState([])
   const [calls, setCalls] = useState(0)
+  const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    const init = async () => {
+      const token = await getAccessToken()
+      if (!token) {
+        // Перенаправляем на страницу входа банка с сообщением
+        router.push('/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке')
+        return
+      }
+
+      const { data: { user } } = await supabase.auth.getUser(token)
+      if (!user) {
+        router.push('/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке')
+        return
+      }
+      setUser(user)
+
+      // Профиль
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('display_name, first_name, last_name, avatar_url, position_id, positions(title)')
+        .eq('user_id', user.id)
+        .single()
+      if (profileData) setProfile(profileData)
+
+      // Баланс
+      const { data: balanceData } = await supabase
+        .from('karma_balance')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single()
+      if (balanceData) setBalance(balanceData.balance)
+
+      // Задания CRM (автоматические, in_progress)
+      const { data: taskAssignments } = await supabase
+        .from('task_assignments')
+        .select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)')
+        .eq('user_id', user.id)
+        .eq('status', 'in_progress')
+        .eq('tasks.task_type', 'auto_crm')
+      if (taskAssignments) setTasks(taskAssignments)
+
+      // Звонки из localStorage
+      const savedCalls = localStorage.getItem(`crm_calls_${user.id}`)
+      if (savedCalls) setCalls(parseInt(savedCalls))
+
+      setLoading(false)
+    }
+    init()
+  }, [])
+
+  // Листопад и облака (без изменений, как в предыдущей рабочей версии)
   useEffect(() => {
     const leafContainer = document.getElementById('leafContainer')
     if (!leafContainer) return
@@ -40,22 +99,66 @@ export default function CRM() {
     return () => clearInterval(leafInterval)
   }, [])
 
+  const addCall = async () => {
+    const newCalls = calls + 1
+    setCalls(newCalls)
+    localStorage.setItem(`crm_calls_${user.id}`, newCalls.toString())
+
+    // Проверяем автоматические задания
+    for (const assignment of tasks) {
+      const t = assignment.tasks
+      if (t && t.crm_action_type === 'call' && newCalls >= t.crm_target_count) {
+        // Завершаем задание
+        await supabase
+          .from('task_assignments')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('id', assignment.id)
+      }
+    }
+
+    // Обновляем список заданий
+    const { data: updatedAssignments } = await supabase
+      .from('task_assignments')
+      .select('id, status, task_id, tasks(id, title, reward_karma, crm_action_type, crm_target_count)')
+      .eq('user_id', user.id)
+      .eq('status', 'in_progress')
+      .eq('tasks.task_type', 'auto_crm')
+    if (updatedAssignments) setTasks(updatedAssignments)
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#E8F4FD' }}>
+        Загрузка...
+      </div>
+    )
+  }
+
+  const displayName = profile?.first_name
+    ? `${profile.first_name} ${profile.last_name || ''}`
+    : profile?.display_name || user?.email
+
+  const positionTitle = profile?.positions?.title || 'Сотрудник'
+
   return (
     <div className="crm-wrapper">
       <Head>
-        <title>CRM Весна</title>
+        <title>CRM Лето</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
 
+      {/* Фон с облаками */}
       <div className="cloud-bg">
         <div className="cloud cloud1"></div>
         <div className="cloud cloud2"></div>
         <div className="cloud cloud3"></div>
       </div>
 
+      {/* Листопад */}
       <div className="leaf-container" id="leafContainer" />
 
+      {/* Кнопка вызова ветра */}
       <div className="wind-btn" id="windButton" title="Вызвать лёгкий ветер">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 2C12 2 6 7 6 12C6 17 12 20 12 20C12 20 18 17 18 12C18 7 12 2 12 2Z" strokeLinecap="round"/>
@@ -63,26 +166,33 @@ export default function CRM() {
         </svg>
       </div>
 
-      <div className="top-logo">CRM Весна</div>
+      {/* Логотип */}
+      <div className="top-logo">CRM Лето</div>
+
+      {/* Планета Земля */}
       <a href="/planet" className="planet-link">Моя любимая планета Земля</a>
 
       {/* Сайдбар */}
       <div className="sidebar">
         <div className="user-panel">
-          <svg className="avatar-svg" viewBox="0 0 52 52" fill="none">
-            <rect width="52" height="52" rx="16" fill="url(#av-grad)"/>
-            <circle cx="26" cy="20" r="8" fill="white" opacity="0.9"/>
-            <ellipse cx="26" cy="40" rx="14" ry="8" fill="white" opacity="0.7"/>
-            <defs>
-              <linearGradient id="av-grad" x1="0" y1="0" x2="52" y2="52">
-                <stop offset="0%" stopColor="#A3E0B0"/>
-                <stop offset="100%" stopColor="#4CAF6A"/>
-              </linearGradient>
-            </defs>
-          </svg>
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt="" className="avatar-svg" style={{ borderRadius: '50%', objectFit: 'cover' }} />
+          ) : (
+            <svg className="avatar-svg" viewBox="0 0 52 52" fill="none">
+              <rect width="52" height="52" rx="16" fill="url(#av-grad)"/>
+              <circle cx="26" cy="20" r="8" fill="white" opacity="0.9"/>
+              <ellipse cx="26" cy="40" rx="14" ry="8" fill="white" opacity="0.7"/>
+              <defs>
+                <linearGradient id="av-grad" x1="0" y1="0" x2="52" y2="52">
+                  <stop offset="0%" stopColor="#A3E0B0"/>
+                  <stop offset="100%" stopColor="#4CAF6A"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          )}
           <div>
-            <div className="username">Артур</div>
-            <div className="user-role">Менеджер</div>
+            <div className="username">{displayName}</div>
+            <div className="user-role">{positionTitle}</div>
           </div>
         </div>
         <div className="balance">
@@ -90,19 +200,10 @@ export default function CRM() {
             <div className="balance-icon">
               <svg viewBox="0 0 32 32" fill="none"><path d="M16 4C16 4 8 10 8 18C8 26 16 28 16 28C16 28 24 26 24 18C24 10 16 4 16 4Z" stroke="#4CAF6A" strokeWidth="2" fill="#A3E0B0" fillOpacity="0.3"/><path d="M13 12L16 15L19 12" stroke="#4CAF6A" strokeWidth="1.5" strokeLinecap="round"/></svg>
             </div>
-            <div className="balance-info"><span className="balance-value karma-color">1 250</span><span className="balance-label">Кармики</span></div>
-          </div>
-          <div className="balance-item">
-            <div className="balance-icon">
-              <svg viewBox="0 0 32 32" fill="none"><path d="M18 4L10 16H16L14 28L24 13H17L18 4Z" stroke="#F4B860" strokeWidth="2" fill="#F4B860" fillOpacity="0.2"/></svg>
+            <div className="balance-info">
+              <span className="balance-value karma-color">{balance}</span>
+              <span className="balance-label">Кармики</span>
             </div>
-            <div className="balance-info"><span className="balance-value energy-color">340</span><span className="balance-label">Энергия</span></div>
-          </div>
-          <div className="balance-item">
-            <div className="balance-icon">
-              <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="12" stroke="#F28B82" strokeWidth="2"/><text x="16" y="21" textAnchor="middle" fill="#F28B82" fontSize="14" fontWeight="700">₽</text></svg>
-            </div>
-            <div className="balance-info"><span className="balance-value rubles-color">15 200</span><span className="balance-label">Бонус (₽)</span></div>
           </div>
         </div>
       </div>
@@ -112,11 +213,33 @@ export default function CRM() {
         <div className="left-col">
           <div className="actions">
             <button className="action-btn primary">Новая сделка</button>
-            <button className="action-btn" onClick={() => setCalls(prev => prev + 1)}>Звонок</button>
+            <button className="action-btn" onClick={addCall}>Звонок</button>
             <button className="action-btn">Письмо</button>
             <button className="action-btn">Встреча</button>
           </div>
 
+          {/* Задания CRM */}
+          {tasks.length > 0 && (
+            <div className="panel">
+              <h3>Задания CRM</h3>
+              {tasks.map(assignment => {
+                const t = assignment.tasks
+                return (
+                  <div key={assignment.id} className="activity-item" style={{ borderBottom: '1px solid #E5F0E8', padding: '10px 0' }}>
+                    <div className="activity-text">
+                      <span className="font-medium">{t.title}</span>
+                      <div className="text-xs" style={{ color: '#5B7465' }}>
+                        Звонков: {calls} из {t.crm_target_count}
+                      </div>
+                    </div>
+                    <span className="text-sm" style={{ color: '#4CAF6A', fontWeight: 600 }}>+{t.reward_karma}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Воронка продаж */}
           <div className="panel">
             <h3>Воронка продаж</h3>
             <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width:'80%'}}></div></div><span className="stage-count">12 сделок</span></div>
@@ -125,6 +248,8 @@ export default function CRM() {
             <div className="funnel-stage"><span className="stage-name">Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width:'25%'}}></div></div><span className="stage-count">3 сделки</span></div>
             <div className="funnel-stage"><span className="stage-name">Закрыто</span><div className="stage-bar"><div className="stage-fill" style={{width:'15%'}}></div></div><span className="stage-count">2 сделки</span></div>
           </div>
+
+          {/* Активность команды */}
           <div className="panel" style={{flex:1}}>
             <h3>Активность команды</h3>
             <div className="activity-item"><div className="activity-text">Петров позвонил клиенту и получил <span className="activity-highlight" style={{color:'#4CAF6A'}}>+5 кармиков</span></div><div className="activity-time">5 мин назад</div></div>
@@ -132,6 +257,7 @@ export default function CRM() {
             <div className="activity-item"><div className="activity-text">Сидоров ответил на письмо клиента <span className="activity-highlight" style={{color:'#4CAF6A'}}>+3 кармика</span></div><div className="activity-time">22 мин назад</div></div>
           </div>
         </div>
+
         <div className="right-col">
           <div className="panel" style={{flex:1, display:'flex', flexDirection:'column'}}>
             <h3>Цели на сегодня</h3>
