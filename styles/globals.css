@@ -15,7 +15,6 @@ html, body {
   z-index: 2;
 }
 
-/* Облака */
 .cloud-bg {
   position: fixed;
   top: 0;
@@ -53,7 +52,6 @@ html, body {
   100% { transform: translateX(calc(100vw + 200px)); }
 }
 
-/* Листопад */
 .leaf-container {
   position: fixed;
   top: 0;
@@ -76,7 +74,6 @@ html, body {
   100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
 }
 
-/* Сайдбар */
 .sidebar {
   width: 280px;
   background: #F2F9F4;
@@ -106,7 +103,6 @@ html, body {
 .karma-color { color: #4CAF6A; } .energy-color { color: #F4B860; } .rubles-color { color: #F28B82; }
 .balance-label { font-size: 11px; color: #5B7465; text-transform: uppercase; letter-spacing: 0.4px; }
 
-/* Основной контент */
 .main-content {
   flex: 1;
   display: flex;
@@ -143,7 +139,6 @@ html, body {
 .activity-highlight { font-weight: 600; }
 .activity-time { font-size: 12px; color: #5B7465; }
 
-/* Кнопки */
 .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
 .action-btn {
   background: white;
@@ -164,7 +159,6 @@ html, body {
 .action-btn.primary { background: #4CAF6A; border-color: #4CAF6A; color: white; }
 .action-btn.primary:hover { background: #43A05E; }
 
-/* Кнопка ветра */
 .wind-btn {
   position: fixed;
   bottom: 28px;
@@ -184,8 +178,8 @@ html, body {
   color: #4CAF6A;
 }
 .wind-btn:hover { background: white; }
+.wind-btn svg { width: 28px; height: 28px; pointer-events: none; }
 
-/* Планета (маленькая ссылка) */
 .planet-link {
   position: fixed;
   top: 16px;
