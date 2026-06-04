@@ -61,14 +61,11 @@ export default function CRM() {
       updates.is_active = false
       if (goal.reward_karma > 0) {
         await supabase.from('karma_transactions').insert({
-          user_id: user.id,
-          amount: goal.reward_karma,
-          type: 'goal_reward',
+          user_id: user.id, amount: goal.reward_karma, type: 'goal_reward',
           description: `Достижение цели: ${goal.title}`
         })
         const { data: bal } = await supabase.from('karma_balance').select('balance').eq('user_id', user.id).single()
         if (bal) await supabase.from('karma_balance').update({ balance: bal.balance + goal.reward_karma }).eq('user_id', user.id)
-        setBalance(prev => prev + goal.reward_karma)
       }
     }
     const { error } = await supabase.from('goals').update(updates).eq('id', goalId)
@@ -97,11 +94,12 @@ export default function CRM() {
     if (updatedAssignments) setTasks(updatedAssignments)
   }
 
-  // Листопад и облака (без изменений)
+  // ===== ЛИСТОПАД И ОБЛАКА =====
   useEffect(() => {
     const leafContainer = document.getElementById('leafContainer')
     if (!leafContainer) return
     let leafInterval
+
     function createLeaf() {
       const leaf = document.createElementNS("http://www.w3.org/2000/svg", "svg")
       leaf.setAttribute("viewBox", "0 0 30 30")
@@ -117,29 +115,42 @@ export default function CRM() {
       leafContainer.appendChild(leaf)
       setTimeout(() => { if (leaf.parentNode) leaf.remove() }, duration * 1000 + 500)
     }
+
     leafInterval = setInterval(createLeaf, 200)
     setTimeout(() => clearInterval(leafInterval), 5000)
+
     const windButton = document.getElementById('windButton')
     if (windButton) {
-      windButton.onclick = () => { clearInterval(leafInterval); leafInterval = setInterval(createLeaf, 150); setTimeout(() => clearInterval(leafInterval), 10000) }
+      windButton.onclick = () => {
+        clearInterval(leafInterval)
+        leafInterval = setInterval(createLeaf, 150)
+        setTimeout(() => clearInterval(leafInterval), 10000)
+      }
     }
+
     return () => clearInterval(leafInterval)
   }, [])
 
   if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
+
   if (needsLogin) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#E8F4FD' }}>
         <div style={{ textAlign: 'center', background: 'white', padding: '48px', borderRadius: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <h2 style={{ marginBottom: '16px', fontWeight: 600, color: '#2D6A4F' }}>Добро пожаловать в CRM Лето</h2>
           <p style={{ marginBottom: '24px', color: '#5B7465' }}>Для работы с CRM необходимо авторизоваться в Кармическом банке</p>
-          <a href="https://arthurcrm.vercel.app/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке" style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}>Войти в Кармический банк</a>
+          <a href="https://arthurcrm.vercel.app/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке"
+             style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}>
+            Войти в Кармический банк
+          </a>
         </div>
       </div>
     )
   }
 
   const displayName = profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : user?.email
+  const activeTasksCount = tasks.length
+  const potentialEarn = tasks.reduce((sum, a) => sum + (a.tasks?.reward_karma || 0), 0)
 
   return (
     <>
@@ -171,7 +182,6 @@ export default function CRM() {
           </svg>
         </div>
 
-        {/* Сайдбар */}
         <div className="sidebar">
           <div className="balance-item">
             <div className="balance-icon">
@@ -181,8 +191,8 @@ export default function CRM() {
           </div>
 
           <div className="dash-mini">
-            <div className="dash-row"><span>Заданий CRM</span><span>{tasks.length}</span></div>
-            <div className="dash-row"><span>Можно заработать</span><span style={{color:'#4CAF6A'}}>+{tasks.reduce((s,a)=>s+(a.tasks?.reward_karma||0),0)}</span></div>
+            <div className="dash-row"><span>Заданий CRM</span><span>{activeTasksCount}</span></div>
+            <div className="dash-row"><span>Можно заработать</span><span style={{color:'#4CAF6A'}}>+{potentialEarn}</span></div>
             <div className="dash-row"><span>Звонков сегодня</span><span>{calls}</span></div>
           </div>
 
@@ -199,7 +209,6 @@ export default function CRM() {
           )}
         </div>
 
-        {/* Основной контент */}
         <div className="main-content">
           <div className="left-col">
             <div className="actions">
