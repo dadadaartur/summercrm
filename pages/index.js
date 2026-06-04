@@ -17,30 +17,32 @@ export default function CRM() {
     if (!router.isReady) return
 
     const init = async () => {
-      const urlToken = router.query.token
+      const accessToken = router.query.access_token
+      const refreshToken = router.query.refresh_token
 
-      if (urlToken) {
-        console.log('Токен получен из URL, устанавливаем сессию...')
-        const { data: { user: currentUser }, error } = await supabase.auth.setSession({
-          access_token: urlToken,
-          refresh_token: '',
+      if (accessToken && refreshToken) {
+        console.log('Токены получены, устанавливаем сессию...')
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
         })
 
-        if (error || !currentUser) {
+        if (error || !data.user) {
           console.error('Ошибка установки сессии:', error)
           setNeedsLogin(true)
           setLoading(false)
           return
         }
 
-        console.log('Сессия установлена, пользователь:', currentUser.email)
-        setUser(currentUser)
-        await loadUserData(currentUser.id)
-        router.replace('/') // убираем токен из URL
+        console.log('Сессия установлена, пользователь:', data.user.email)
+        setUser(data.user)
+        await loadUserData(data.user.id)
+        // Убираем токены из URL и перезагружаем страницу
+        router.replace('/')
         return
       }
 
-      // Токена нет – проверяем существующую сессию
+      // Токенов нет – проверяем существующую сессию
       const { data: { user: existingUser }, error: getUserError } = await supabase.auth.getUser()
       if (getUserError || !existingUser) {
         console.log('Нет активной сессии')
@@ -56,10 +58,9 @@ export default function CRM() {
     }
 
     init()
-  }, [router.isReady, router.query.token])
+  }, [router.isReady, router.query])
 
   const loadUserData = async (userId) => {
-    // Профиль
     const { data: profileData } = await supabase
       .from('profiles')
       .select('display_name, first_name, last_name, avatar_url, position_id, positions(title)')
@@ -67,7 +68,6 @@ export default function CRM() {
       .single()
     if (profileData) setProfile(profileData)
 
-    // Баланс
     const { data: balanceData } = await supabase
       .from('karma_balance')
       .select('balance')
@@ -75,7 +75,6 @@ export default function CRM() {
       .single()
     if (balanceData) setBalance(balanceData.balance)
 
-    // Задания CRM
     const { data: taskAssignments } = await supabase
       .from('task_assignments')
       .select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)')
@@ -84,7 +83,6 @@ export default function CRM() {
       .eq('tasks.task_type', 'auto_crm')
     if (taskAssignments) setTasks(taskAssignments)
 
-    // Звонки
     const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
     if (savedCalls) setCalls(parseInt(savedCalls))
 
