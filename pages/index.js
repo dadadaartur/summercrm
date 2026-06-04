@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { supabase, getAccessToken } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabaseClient'
 
 export default function CRM() {
+  const router = useRouter()
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [balance, setBalance] = useState(0)
@@ -12,57 +14,82 @@ export default function CRM() {
   const [needsLogin, setNeedsLogin] = useState(false)
 
   useEffect(() => {
+    if (!router.isReady) return
+
     const init = async () => {
-      const token = await getAccessToken()
-      if (!token) {
+      // Проверяем, есть ли токен в URL (передан из банка)
+      const urlToken = router.query.token
+
+      if (urlToken) {
+        // Устанавливаем сессию из токена
+        const { data: { user: currentUser }, error } = await supabase.auth.setSession({
+          access_token: urlToken,
+          refresh_token: '',
+        })
+
+        if (error || !currentUser) {
+          setNeedsLogin(true)
+          setLoading(false)
+          return
+        }
+
+        setUser(currentUser)
+        await loadUserData(currentUser.id)
+        // Очищаем токен из URL, чтобы не мешал
+        router.replace('/')
+        return
+      }
+
+      // Токена нет – проверяем, есть ли уже активная сессия
+      const { data: { user: existingUser } } = await supabase.auth.getUser()
+      if (!existingUser) {
         setNeedsLogin(true)
         setLoading(false)
         return
       }
 
-      const { data: { user } } = await supabase.auth.getUser(token)
-      if (!user) {
-        setNeedsLogin(true)
-        setLoading(false)
-        return
-      }
-      setUser(user)
-
-      // Профиль
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('display_name, first_name, last_name, avatar_url, position_id, positions(title)')
-        .eq('user_id', user.id)
-        .single()
-      if (profileData) setProfile(profileData)
-
-      // Баланс
-      const { data: balanceData } = await supabase
-        .from('karma_balance')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single()
-      if (balanceData) setBalance(balanceData.balance)
-
-      // Задания CRM
-      const { data: taskAssignments } = await supabase
-        .from('task_assignments')
-        .select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)')
-        .eq('user_id', user.id)
-        .eq('status', 'in_progress')
-        .eq('tasks.task_type', 'auto_crm')
-      if (taskAssignments) setTasks(taskAssignments)
-
-      // Звонки из localStorage
-      const savedCalls = localStorage.getItem(`crm_calls_${user.id}`)
-      if (savedCalls) setCalls(parseInt(savedCalls))
-
+      setUser(existingUser)
+      await loadUserData(existingUser.id)
       setLoading(false)
     }
-    init()
-  }, [])
 
-  // Листопад и облака
+    init()
+  }, [router.isReady, router.query.token])
+
+  const loadUserData = async (userId) => {
+    // Профиль
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('display_name, first_name, last_name, avatar_url, position_id, positions(title)')
+      .eq('user_id', userId)
+      .single()
+    if (profileData) setProfile(profileData)
+
+    // Баланс
+    const { data: balanceData } = await supabase
+      .from('karma_balance')
+      .select('balance')
+      .eq('user_id', userId)
+      .single()
+    if (balanceData) setBalance(balanceData.balance)
+
+    // Задания CRM (автоматические, in_progress)
+    const { data: taskAssignments } = await supabase
+      .from('task_assignments')
+      .select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)')
+      .eq('user_id', userId)
+      .eq('status', 'in_progress')
+      .eq('tasks.task_type', 'auto_crm')
+    if (taskAssignments) setTasks(taskAssignments)
+
+    // Звонки из localStorage
+    const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
+    if (savedCalls) setCalls(parseInt(savedCalls))
+
+    setLoading(false)
+  }
+
+  // Листопад и облака (без изменений)
   useEffect(() => {
     const leafContainer = document.getElementById('leafContainer')
     if (!leafContainer) return
@@ -131,7 +158,7 @@ export default function CRM() {
     )
   }
 
-  // Если нужен вход – показываем красивую страницу с кнопкой
+  // Если нужен вход – показываем статичную страницу с кнопкой
   if (needsLogin) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#E8F4FD' }}>
