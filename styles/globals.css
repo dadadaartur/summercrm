@@ -8,6 +8,14 @@ html, body {
   overflow-x: hidden;
 }
 
+/* Убираем курсор ввода на элементах, которые не являются полями ввода */
+div, span, p, h1, h2, h3, h4, h5, h6, button, a, svg {
+  cursor: default;
+}
+input, textarea, [contenteditable="true"] {
+  cursor: text;
+}
+
 .crm-wrapper {
   display: flex;
   height: 100vh;
@@ -116,5 +124,6 @@ html, body {
 .planet-link:hover { background: white; }
 
 .top-logo {
-  position: fixed; top: 12px; left: 24px; z-index: 1000; font-weight: 700; color: #2D6A4F; font-size: 18px;
+  position: fixed; top: 16px; left: 24px; z-index: 1000; font-weight: 700; color: #2D6A4F; font-size: 18px;
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(4px); padding: 4px 16px; border-radius: 20px;
 }
