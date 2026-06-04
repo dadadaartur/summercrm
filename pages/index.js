@@ -42,7 +42,11 @@ export default function CRM() {
 
   return (
     <div className="crm-wrapper">
-      <Head><title>CRM Весна</title></Head>
+      <Head>
+        <title>CRM Весна</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+      </Head>
 
       <div className="cloud-bg">
         <div className="cloud cloud1"></div>
@@ -62,6 +66,7 @@ export default function CRM() {
       <div className="top-logo">CRM Весна</div>
       <a href="/planet" className="planet-link">Моя любимая планета Земля</a>
 
+      {/* Сайдбар */}
       <div className="sidebar">
         <div className="user-panel">
           <svg className="avatar-svg" viewBox="0 0 52 52" fill="none">
@@ -102,6 +107,7 @@ export default function CRM() {
         </div>
       </div>
 
+      {/* Основной контент */}
       <div className="main-content">
         <div className="left-col">
           <div className="actions">
@@ -147,6 +153,7 @@ export default function CRM() {
         </div>
       </div>
 
+      {/* Стили прямо здесь, чтобы избежать конфликтов */}
       <style jsx>{`
         .top-logo {
           position: fixed;
@@ -156,6 +163,11 @@ export default function CRM() {
           font-weight: 700;
           color: #2D6A4F;
           font-size: 18px;
+        }
+        .wind-btn svg {
+          width: 28px;
+          height: 28px;
+          pointer-events: none;
         }
       `}</style>
     </div>
