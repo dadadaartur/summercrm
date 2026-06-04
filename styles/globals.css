@@ -59,7 +59,7 @@ input, textarea, [contenteditable="true"] { cursor: text; }
 }
 .planet-link:hover { background: white; }
 
-/* Основная обёртка (сдвиг под верхнюю панель) */
+/* Основная обёртка */
 .crm-wrapper {
   display: flex;
   height: calc(100vh - 48px);
@@ -123,7 +123,7 @@ input, textarea, [contenteditable="true"] { cursor: text; }
 .balance-icon svg { width: 32px; height: 32px; }
 .balance-info { display: flex; flex-direction: column; }
 .balance-value { font-size: 20px; font-weight: 700; }
-.karma-color { color: #4CAF6A; } .energy-color { color: #F4B860; } .rubles-color { color: #F28B82; }
+.karma-color { color: #4CAF6A; }
 .balance-label { font-size: 11px; color: #5B7465; text-transform: uppercase; letter-spacing: 0.4px; }
 
 .dash-mini {
@@ -183,3 +183,8 @@ input, textarea, [contenteditable="true"] { cursor: text; }
 }
 .wind-btn:hover { background: white; }
 .wind-btn svg { width: 28px; height: 28px; pointer-events: none; }
+
+/* Адаптивность */
+@media (max-width: 1200px) {
+  .right-col { margin-top: 0; }
+}
