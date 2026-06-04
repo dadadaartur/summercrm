@@ -6,11 +6,10 @@ export default function CRM() {
 
   useEffect(() => {
     const leafContainer = document.getElementById('leafContainer')
-    const windButton = document.getElementById('windButton')
-    let leafInterval = null
+    if (!leafContainer) return
+    let leafInterval
 
     function createLeaf() {
-      if (!leafContainer) return
       const leaf = document.createElementNS("http://www.w3.org/2000/svg", "svg")
       leaf.setAttribute("viewBox", "0 0 30 30")
       leaf.classList.add("leaf")
@@ -21,43 +20,25 @@ export default function CRM() {
       leaf.setAttribute("width", size)
       leaf.setAttribute("height", size)
       const colors = ['#7AC78F', '#4CAF6A', '#A3E0B0', '#F4B860', '#F28B82', '#FFD700']
-      const fill = colors[Math.floor(Math.random() * colors.length)]
-      leaf.innerHTML = `
-        <path d="M15 3C15 3 7 9 7 16C7 23 15 26 15 26C15 26 23 23 23 16C23 9 15 3 15 3Z" 
-              fill="${fill}" opacity="0.8" stroke="#4CAF6A" stroke-width="1.5"/>
-        <line x1="15" y1="26" x2="15" y2="29" stroke="#4CAF6A" stroke-width="1.5"/>
-      `
+      leaf.innerHTML = `<path d="M15 3C15 3 7 9 7 16C7 23 15 26 15 26C15 26 23 23 23 16C23 9 15 3 15 3Z" fill="${colors[Math.floor(Math.random() * colors.length)]}" opacity="0.8" stroke="#4CAF6A" stroke-width="1.5"/><line x1="15" y1="26" x2="15" y2="29" stroke="#4CAF6A" stroke-width="1.5"/>`
       leafContainer.appendChild(leaf)
-      setTimeout(() => {
-        if (leaf.parentNode) leaf.remove()
-      }, duration * 1000 + 500)
+      setTimeout(() => { if (leaf.parentNode) leaf.remove() }, duration * 1000 + 500)
     }
 
-    function startLeafFall(durationMs, frequencyMs = 180) {
-      if (leafInterval) clearInterval(leafInterval)
-      leafInterval = setInterval(createLeaf, frequencyMs)
-      setTimeout(() => {
-        clearInterval(leafInterval)
-        leafInterval = null
-      }, durationMs)
-    }
+    leafInterval = setInterval(createLeaf, 200)
+    setTimeout(() => clearInterval(leafInterval), 5000)
 
-    startLeafFall(5000, 200)
-
+    const windButton = document.getElementById('windButton')
     if (windButton) {
-      windButton.addEventListener('click', () => {
-        if (leafInterval) {
-          clearInterval(leafInterval)
-          leafInterval = null
-        }
-        startLeafFall(10000, 150)
-      })
+      windButton.onclick = () => {
+        clearInterval(leafInterval)
+        leafInterval = setInterval(createLeaf, 150)
+        setTimeout(() => clearInterval(leafInterval), 10000)
+      }
     }
 
     return () => clearInterval(leafInterval)
   }, [])
-
-  const addCall = () => setCalls(prev => prev + 1)
 
   return (
     <div className="crm-wrapper">
@@ -78,13 +59,9 @@ export default function CRM() {
         </svg>
       </div>
 
-      <div style={{ position: 'fixed', top: 12, left: 24, zIndex: 1000, fontWeight: 700, color: '#2D6A4F' }}>
-        CRM Весна
-      </div>
-
+      <div className="top-logo">CRM Весна</div>
       <a href="/planet" className="planet-link">Моя любимая планета Земля</a>
 
-      {/* Сайдбар */}
       <div className="sidebar">
         <div className="user-panel">
           <svg className="avatar-svg" viewBox="0 0 52 52" fill="none">
@@ -125,41 +102,28 @@ export default function CRM() {
         </div>
       </div>
 
-      {/* Основной контент */}
       <div className="main-content">
         <div className="left-col">
           <div className="actions">
-            <button className="action-btn primary">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
-              Новая сделка
-            </button>
-            <button className="action-btn" onClick={addCall}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 6L16 2V6H22ZM22 6L16 10V6H22ZM16 6H10C5 6 2 9 2 14C2 18 5 20 10 20H16" stroke="#4CAF6A" strokeWidth="2"/></svg>
-              Звонок
-            </button>
-            <button className="action-btn">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke="#F4B860" strokeWidth="2"/><path d="M8 9H16M8 13H14" stroke="#F4B860" strokeWidth="2"/></svg>
-              Письмо
-            </button>
-            <button className="action-btn">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#F28B82" strokeWidth="2"/><path d="M8 12L11 15L16 9" stroke="#F28B82" strokeWidth="2" strokeLinecap="round"/></svg>
-              Встреча
-            </button>
+            <button className="action-btn primary">Новая сделка</button>
+            <button className="action-btn" onClick={() => setCalls(prev => prev + 1)}>Звонок</button>
+            <button className="action-btn">Письмо</button>
+            <button className="action-btn">Встреча</button>
           </div>
 
           <div className="panel">
             <h3>Воронка продаж</h3>
-            <div className="funnel-stage"><span className="stage-name"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#A3E0B0" strokeWidth="2"/></svg>Новые</span><div className="stage-bar"><div className="stage-fill" style={{width:'80%'}}></div></div><span className="stage-count">12 сделок</span></div>
-            <div className="funnel-stage"><span className="stage-name"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="12" rx="2" stroke="#A3E0B0" strokeWidth="2"/></svg>Квалификация</span><div className="stage-bar"><div className="stage-fill" style={{width:'55%'}}></div></div><span className="stage-count">8 сделок</span></div>
-            <div className="funnel-stage"><span className="stage-name"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M4 6H16L12 10L16 14H4L8 10L4 6Z" stroke="#A3E0B0" strokeWidth="2"/></svg>Предложение</span><div className="stage-bar"><div className="stage-fill" style={{width:'40%'}}></div></div><span className="stage-count">5 сделок</span></div>
-            <div className="funnel-stage"><span className="stage-name"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#A3E0B0" strokeWidth="2"/><path d="M7 10H13M10 7V13" stroke="#A3E0B0" strokeWidth="2"/></svg>Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width:'25%'}}></div></div><span className="stage-count">3 сделки</span></div>
-            <div className="funnel-stage"><span className="stage-name"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M6 10L9 13L14 7" stroke="#4CAF6A" strokeWidth="2" strokeLinecap="round"/></svg>Закрыто</span><div className="stage-bar"><div className="stage-fill" style={{width:'15%'}}></div></div><span className="stage-count">2 сделки</span></div>
+            <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width:'80%'}}></div></div><span className="stage-count">12 сделок</span></div>
+            <div className="funnel-stage"><span className="stage-name">Квалификация</span><div className="stage-bar"><div className="stage-fill" style={{width:'55%'}}></div></div><span className="stage-count">8 сделок</span></div>
+            <div className="funnel-stage"><span className="stage-name">Предложение</span><div className="stage-bar"><div className="stage-fill" style={{width:'40%'}}></div></div><span className="stage-count">5 сделок</span></div>
+            <div className="funnel-stage"><span className="stage-name">Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width:'25%'}}></div></div><span className="stage-count">3 сделки</span></div>
+            <div className="funnel-stage"><span className="stage-name">Закрыто</span><div className="stage-bar"><div className="stage-fill" style={{width:'15%'}}></div></div><span className="stage-count">2 сделки</span></div>
           </div>
           <div className="panel" style={{flex:1}}>
             <h3>Активность команды</h3>
-            <div className="activity-item"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M22 6L16 2V6H22ZM22 6L16 10V6H22ZM16 6H10C5 6 2 9 2 14C2 18 5 20 10 20H16" stroke="#4CAF6A" strokeWidth="2"/></svg><div className="activity-text">Петров позвонил клиенту и получил <span className="activity-highlight" style={{color:'#4CAF6A'}}>+5 кармиков</span></div><div className="activity-time">5 мин назад</div></div>
-            <div className="activity-item"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 12L10 16L18 8" stroke="#F4B860" strokeWidth="2" strokeLinecap="round"/></svg><div className="activity-text">Иванова закрыла сделку на 500 000 ₽ и получила <span className="activity-highlight" style={{color:'#4CAF6A'}}>+50 кармиков</span> <span className="activity-highlight" style={{color:'#F28B82'}}>+5 000 ₽</span></div><div className="activity-time">12 мин назад</div></div>
-            <div className="activity-item"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke="#A3E0B0" strokeWidth="2"/><path d="M8 9H16M8 13H14" stroke="#A3E0B0" strokeWidth="2"/></svg><div className="activity-text">Сидоров ответил на письмо клиента <span className="activity-highlight" style={{color:'#4CAF6A'}}>+3 кармика</span></div><div className="activity-time">22 мин назад</div></div>
+            <div className="activity-item"><div className="activity-text">Петров позвонил клиенту и получил <span className="activity-highlight" style={{color:'#4CAF6A'}}>+5 кармиков</span></div><div className="activity-time">5 мин назад</div></div>
+            <div className="activity-item"><div className="activity-text">Иванова закрыла сделку на 500 000 ₽ и получила <span className="activity-highlight" style={{color:'#4CAF6A'}}>+50 кармиков</span> <span className="activity-highlight" style={{color:'#F28B82'}}>+5 000 ₽</span></div><div className="activity-time">12 мин назад</div></div>
+            <div className="activity-item"><div className="activity-text">Сидоров ответил на письмо клиента <span className="activity-highlight" style={{color:'#4CAF6A'}}>+3 кармика</span></div><div className="activity-time">22 мин назад</div></div>
           </div>
         </div>
         <div className="right-col">
@@ -182,6 +146,18 @@ export default function CRM() {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .top-logo {
+          position: fixed;
+          top: 12px;
+          left: 24px;
+          z-index: 1000;
+          font-weight: 700;
+          color: #2D6A4F;
+          font-size: 18px;
+        }
+      `}</style>
     </div>
   )
 }
