@@ -16,7 +16,6 @@ export default function CRM() {
     const init = async () => {
       const token = await getAccessToken()
       if (!token) {
-        // Перенаправляем на страницу входа банка с сообщением
         router.push('/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке')
         return
       }
@@ -62,7 +61,7 @@ export default function CRM() {
     init()
   }, [])
 
-  // Листопад и облака (без изменений, как в предыдущей рабочей версии)
+  // Листопад и облака
   useEffect(() => {
     const leafContainer = document.getElementById('leafContainer')
     if (!leafContainer) return
@@ -104,11 +103,9 @@ export default function CRM() {
     setCalls(newCalls)
     localStorage.setItem(`crm_calls_${user.id}`, newCalls.toString())
 
-    // Проверяем автоматические задания
     for (const assignment of tasks) {
       const t = assignment.tasks
       if (t && t.crm_action_type === 'call' && newCalls >= t.crm_target_count) {
-        // Завершаем задание
         await supabase
           .from('task_assignments')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
@@ -116,7 +113,6 @@ export default function CRM() {
       }
     }
 
-    // Обновляем список заданий
     const { data: updatedAssignments } = await supabase
       .from('task_assignments')
       .select('id, status, task_id, tasks(id, title, reward_karma, crm_action_type, crm_target_count)')
@@ -148,17 +144,14 @@ export default function CRM() {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
 
-      {/* Фон с облаками */}
       <div className="cloud-bg">
         <div className="cloud cloud1"></div>
         <div className="cloud cloud2"></div>
         <div className="cloud cloud3"></div>
       </div>
 
-      {/* Листопад */}
       <div className="leaf-container" id="leafContainer" />
 
-      {/* Кнопка вызова ветра */}
       <div className="wind-btn" id="windButton" title="Вызвать лёгкий ветер">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 2C12 2 6 7 6 12C6 17 12 20 12 20C12 20 18 17 18 12C18 7 12 2 12 2Z" strokeLinecap="round"/>
@@ -166,13 +159,9 @@ export default function CRM() {
         </svg>
       </div>
 
-      {/* Логотип */}
       <div className="top-logo">CRM Лето</div>
-
-      {/* Планета Земля */}
       <a href="/planet" className="planet-link">Моя любимая планета Земля</a>
 
-      {/* Сайдбар */}
       <div className="sidebar">
         <div className="user-panel">
           {profile?.avatar_url ? (
@@ -200,15 +189,11 @@ export default function CRM() {
             <div className="balance-icon">
               <svg viewBox="0 0 32 32" fill="none"><path d="M16 4C16 4 8 10 8 18C8 26 16 28 16 28C16 28 24 26 24 18C24 10 16 4 16 4Z" stroke="#4CAF6A" strokeWidth="2" fill="#A3E0B0" fillOpacity="0.3"/><path d="M13 12L16 15L19 12" stroke="#4CAF6A" strokeWidth="1.5" strokeLinecap="round"/></svg>
             </div>
-            <div className="balance-info">
-              <span className="balance-value karma-color">{balance}</span>
-              <span className="balance-label">Кармики</span>
-            </div>
+            <div className="balance-info"><span className="balance-value karma-color">{balance}</span><span className="balance-label">Кармики</span></div>
           </div>
         </div>
       </div>
 
-      {/* Основной контент */}
       <div className="main-content">
         <div className="left-col">
           <div className="actions">
@@ -218,7 +203,6 @@ export default function CRM() {
             <button className="action-btn">Встреча</button>
           </div>
 
-          {/* Задания CRM */}
           {tasks.length > 0 && (
             <div className="panel">
               <h3>Задания CRM</h3>
@@ -228,9 +212,7 @@ export default function CRM() {
                   <div key={assignment.id} className="activity-item" style={{ borderBottom: '1px solid #E5F0E8', padding: '10px 0' }}>
                     <div className="activity-text">
                       <span className="font-medium">{t.title}</span>
-                      <div className="text-xs" style={{ color: '#5B7465' }}>
-                        Звонков: {calls} из {t.crm_target_count}
-                      </div>
+                      <div className="text-xs" style={{ color: '#5B7465' }}>Звонков: {calls} из {t.crm_target_count}</div>
                     </div>
                     <span className="text-sm" style={{ color: '#4CAF6A', fontWeight: 600 }}>+{t.reward_karma}</span>
                   </div>
@@ -239,7 +221,6 @@ export default function CRM() {
             </div>
           )}
 
-          {/* Воронка продаж */}
           <div className="panel">
             <h3>Воронка продаж</h3>
             <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width:'80%'}}></div></div><span className="stage-count">12 сделок</span></div>
@@ -249,7 +230,6 @@ export default function CRM() {
             <div className="funnel-stage"><span className="stage-name">Закрыто</span><div className="stage-bar"><div className="stage-fill" style={{width:'15%'}}></div></div><span className="stage-count">2 сделки</span></div>
           </div>
 
-          {/* Активность команды */}
           <div className="panel" style={{flex:1}}>
             <h3>Активность команды</h3>
             <div className="activity-item"><div className="activity-text">Петров позвонил клиенту и получил <span className="activity-highlight" style={{color:'#4CAF6A'}}>+5 кармиков</span></div><div className="activity-time">5 мин назад</div></div>
