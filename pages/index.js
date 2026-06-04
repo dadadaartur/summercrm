@@ -152,24 +152,6 @@ export default function CRM() {
           </div>
         </div>
       </div>
-
-      {/* Стили прямо здесь, чтобы избежать конфликтов */}
-      <style jsx>{`
-        .top-logo {
-          position: fixed;
-          top: 12px;
-          left: 24px;
-          z-index: 1000;
-          font-weight: 700;
-          color: #2D6A4F;
-          font-size: 18px;
-        }
-        .wind-btn svg {
-          width: 28px;
-          height: 28px;
-          pointer-events: none;
-        }
-      `}</style>
     </div>
   )
 }
