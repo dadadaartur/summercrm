@@ -60,8 +60,15 @@ input, textarea, [contenteditable="true"] {
   100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
 }
 
+/* === ИЗМЕНЕНИЯ ДЛЯ САЙДБАРА === */
 .sidebar {
-  width: 280px; background: #F2F9F4; border-right: 1px solid #E5F0E8; padding: 32px 24px; display: flex; flex-direction: column; z-index: 4;
+  width: 280px;
+  background: #F2F9F4;
+  border-right: 1px solid #E5F0E8;
+  padding: 48px 24px 32px;  /* увеличен верхний отступ, чтобы не перекрываться логотипом */
+  display: flex;
+  flex-direction: column;
+  z-index: 4;
 }
 .user-panel { display: flex; align-items: center; gap: 14px; margin-bottom: 32px; }
 .avatar-svg { width: 52px; height: 52px; }
@@ -78,6 +85,7 @@ input, textarea, [contenteditable="true"] {
 .karma-color { color: #4CAF6A; } .energy-color { color: #F4B860; } .rubles-color { color: #F28B82; }
 .balance-label { font-size: 11px; color: #5B7465; text-transform: uppercase; letter-spacing: 0.4px; }
 
+/* Основной контент */
 .main-content { flex: 1; display: flex; gap: 24px; padding: 32px 36px; overflow-y: auto; z-index: 4; }
 .left-col { flex: 2; display: flex; flex-direction: column; gap: 24px; }
 .right-col { flex: 1; display: flex; flex-direction: column; gap: 24px; }
@@ -117,13 +125,47 @@ input, textarea, [contenteditable="true"] {
 .wind-btn:hover { background: white; }
 .wind-btn svg { width: 28px; height: 28px; pointer-events: none; }
 
+/* === ИЗМЕНЕНИЯ ДЛЯ ПЛАНЕТЫ === */
 .planet-link {
-  position: fixed; top: 16px; right: 16px; z-index: 1000; background: rgba(255,255,255,0.7); backdrop-filter: blur(4px);
-  border: 1px solid #E5F0E8; border-radius: 20px; padding: 4px 12px; font-size: 12px; color: #4CAF6A; cursor: pointer; text-decoration: none;
+  position: fixed;
+  top: 48px;           /* было 16px – сдвинули ниже */
+  right: 36px;         /* было 16px – сдвинули левее */
+  z-index: 1000;
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(4px);
+  border: 1px solid #E5F0E8;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #4CAF6A;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;  /* чтобы текст не переносился */
 }
 .planet-link:hover { background: white; }
 
+/* === ИЗМЕНЕНИЯ ДЛЯ ЛОГОТИПА === */
 .top-logo {
-  position: fixed; top: 16px; left: 24px; z-index: 1000; font-weight: 700; color: #2D6A4F; font-size: 18px;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(4px); padding: 4px 16px; border-radius: 20px;
+  position: fixed;
+  top: 20px;           /* немного опустили */
+  left: 20px;
+  z-index: 1000;
+  font-weight: 700;
+  color: #2D6A4F;
+  font-size: 18px;
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(4px);
+  padding: 4px 16px;
+  border-radius: 20px;
+}
+
+/* Адаптивность для экранов меньше 1200px */
+@media (max-width: 1200px) {
+  .right-col {
+    margin-top: 60px;   /* отодвигаем цели от кнопки */
+  }
+  .planet-link {
+    right: 16px;
+    top: 20px;
+  }
 }
