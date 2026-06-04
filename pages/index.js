@@ -51,6 +51,52 @@ export default function CRM() {
     setLoading(false)
   }
 
+  const addProgress = async (goalId, currentVal) => {
+    const newVal = currentVal + 1
+    const goal = goals.find(g => g.id === goalId)
+    if (!goal || newVal > goal.target_value) return
+
+    const updates = { current_value: newVal, updated_at: new Date().toISOString() }
+    if (newVal >= goal.target_value) {
+      updates.is_active = false
+      if (goal.reward_karma > 0) {
+        await supabase.from('karma_transactions').insert({
+          user_id: user.id,
+          amount: goal.reward_karma,
+          type: 'goal_reward',
+          description: `Достижение цели: ${goal.title}`
+        })
+        const { data: bal } = await supabase.from('karma_balance').select('balance').eq('user_id', user.id).single()
+        if (bal) await supabase.from('karma_balance').update({ balance: bal.balance + goal.reward_karma }).eq('user_id', user.id)
+        setBalance(prev => prev + goal.reward_karma)
+      }
+    }
+    const { error } = await supabase.from('goals').update(updates).eq('id', goalId)
+    if (!error) {
+      setGoals(prev => prev.map(g => g.id === goalId ? { ...g, ...updates } : g).filter(g => g.is_active))
+      if (updates.is_active === false) alert('Цель достигнута! Награда начислена.')
+    }
+  }
+
+  const addCall = async () => {
+    const newCalls = calls + 1
+    setCalls(newCalls)
+    localStorage.setItem(`crm_calls_${user.id}`, newCalls.toString())
+    for (const goal of goals.filter(g => g.goal_type === 'calls' && g.is_active)) {
+      if (newCalls > goal.current_value) {
+        await addProgress(goal.id, goal.current_value)
+      }
+    }
+    for (const assignment of tasks) {
+      const t = assignment.tasks
+      if (t && t.crm_action_type === 'call' && newCalls >= t.crm_target_count) {
+        await supabase.from('task_assignments').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', assignment.id)
+      }
+    }
+    const { data: updatedAssignments } = await supabase.from('task_assignments').select('id, status, task_id, tasks(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', user.id).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm')
+    if (updatedAssignments) setTasks(updatedAssignments)
+  }
+
   // Листопад и облака (без изменений)
   useEffect(() => {
     const leafContainer = document.getElementById('leafContainer')
@@ -80,42 +126,14 @@ export default function CRM() {
     return () => clearInterval(leafInterval)
   }, [])
 
-  const addCall = async () => {
-    const newCalls = calls + 1
-    setCalls(newCalls)
-    localStorage.setItem(`crm_calls_${user.id}`, newCalls.toString())
-    for (const assignment of tasks) {
-      const t = assignment.tasks
-      if (t && t.crm_action_type === 'call' && newCalls >= t.crm_target_count) {
-        await supabase
-          .from('task_assignments')
-          .update({ status: 'completed', completed_at: new Date().toISOString() })
-          .eq('id', assignment.id)
-      }
-    }
-    const { data: updatedAssignments } = await supabase
-      .from('task_assignments')
-      .select('id, status, task_id, tasks(id, title, reward_karma, crm_action_type, crm_target_count)')
-      .eq('user_id', user.id)
-      .eq('status', 'in_progress')
-      .eq('tasks.task_type', 'auto_crm')
-    if (updatedAssignments) setTasks(updatedAssignments)
-  }
-
   if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
-
   if (needsLogin) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#E8F4FD' }}>
         <div style={{ textAlign: 'center', background: 'white', padding: '48px', borderRadius: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <h2 style={{ marginBottom: '16px', fontWeight: 600, color: '#2D6A4F' }}>Добро пожаловать в CRM Лето</h2>
           <p style={{ marginBottom: '24px', color: '#5B7465' }}>Для работы с CRM необходимо авторизоваться в Кармическом банке</p>
-          <a
-            href="https://arthurcrm.vercel.app/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке"
-            style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}
-          >
-            Войти в Кармический банк
-          </a>
+          <a href="https://arthurcrm.vercel.app/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке" style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}>Войти в Кармический банк</a>
         </div>
       </div>
     )
@@ -123,19 +141,13 @@ export default function CRM() {
 
   const displayName = profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : user?.email
 
-  const activeTasksCount = tasks.length
-  const potentialEarn = tasks.reduce((sum, a) => sum + (a.tasks?.reward_karma || 0), 0)
-
   return (
     <>
-      {/* Верхняя панель */}
       <div className="crm-topbar">
         <div className="topbar-logo">CRM Лето</div>
         <div className="topbar-right">
           <a className="planet-link" href="/planet">Моя любимая планета Земля</a>
-          <a className="topbar-name" href="https://arthurcrm.vercel.app/profile" target="_blank" rel="noopener noreferrer">
-            {displayName}
-          </a>
+          <a className="topbar-name" href="https://arthurcrm.vercel.app/profile" target="_blank" rel="noopener noreferrer">{displayName}</a>
         </div>
       </div>
 
@@ -168,20 +180,19 @@ export default function CRM() {
             <div className="balance-info"><span className="balance-value karma-color">{balance}</span><span className="balance-label">Кармики</span></div>
           </div>
 
-          {/* Мини‑дашборд */}
           <div className="dash-mini">
-            <div className="dash-row"><span>Заданий CRM</span><span>{activeTasksCount}</span></div>
-            <div className="dash-row"><span>Можно заработать</span><span style={{color: '#4CAF6A'}}>+{potentialEarn}</span></div>
+            <div className="dash-row"><span>Заданий CRM</span><span>{tasks.length}</span></div>
+            <div className="dash-row"><span>Можно заработать</span><span style={{color:'#4CAF6A'}}>+{tasks.reduce((s,a)=>s+(a.tasks?.reward_karma||0),0)}</span></div>
             <div className="dash-row"><span>Звонков сегодня</span><span>{calls}</span></div>
           </div>
 
-          {/* Цели (день / неделя / месяц) */}
           {goals.length > 0 && (
             <div className="dash-mini">
-              {goals.map(g => (
-                <div key={g.id} className="dash-row">
-                  <span>{g.title} ({g.period})</span>
-                  <span>{g.current_value}/{g.target_value}</span>
+              {goals.map(goal => (
+                <div key={goal.id} className="dash-row">
+                  <span>{goal.title} ({goal.period})</span>
+                  <span>{goal.current_value}/{goal.target_value}</span>
+                  <button onClick={() => addProgress(goal.id, goal.current_value)} className="text-xs text-green-400 hover:text-green-300 ml-2">+</button>
                 </div>
               ))}
             </div>
@@ -224,8 +235,6 @@ export default function CRM() {
               <div className="funnel-stage"><span className="stage-name">Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width:'25%'}}></div></div><span className="stage-count">3 сделки</span></div>
               <div className="funnel-stage"><span className="stage-name">Закрыто</span><div className="stage-bar"><div className="stage-fill" style={{width:'15%'}}></div></div><span className="stage-count">2 сделки</span></div>
             </div>
-
-            {/* Активность команды убрана */}
           </div>
 
           <div className="right-col">
