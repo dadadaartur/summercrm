@@ -51,7 +51,7 @@ export default function CRM() {
     setLoading(false)
   }
 
-  // Листопад и облака
+  // Листопад и облака (без изменений)
   useEffect(() => {
     const leafContainer = document.getElementById('leafContainer')
     if (!leafContainer) return
@@ -80,15 +80,49 @@ export default function CRM() {
     return () => clearInterval(leafInterval)
   }, [])
 
-  const addCall = async () => { /* без изменений */ }
+  const addCall = async () => {
+    const newCalls = calls + 1
+    setCalls(newCalls)
+    localStorage.setItem(`crm_calls_${user.id}`, newCalls.toString())
+    for (const assignment of tasks) {
+      const t = assignment.tasks
+      if (t && t.crm_action_type === 'call' && newCalls >= t.crm_target_count) {
+        await supabase
+          .from('task_assignments')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('id', assignment.id)
+      }
+    }
+    const { data: updatedAssignments } = await supabase
+      .from('task_assignments')
+      .select('id, status, task_id, tasks(id, title, reward_karma, crm_action_type, crm_target_count)')
+      .eq('user_id', user.id)
+      .eq('status', 'in_progress')
+      .eq('tasks.task_type', 'auto_crm')
+    if (updatedAssignments) setTasks(updatedAssignments)
+  }
 
   if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
-  if (needsLogin) return ( /* статичная страница входа, как раньше */ )
+
+  if (needsLogin) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#E8F4FD' }}>
+        <div style={{ textAlign: 'center', background: 'white', padding: '48px', borderRadius: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ marginBottom: '16px', fontWeight: 600, color: '#2D6A4F' }}>Добро пожаловать в CRM Лето</h2>
+          <p style={{ marginBottom: '24px', color: '#5B7465' }}>Для работы с CRM необходимо авторизоваться в Кармическом банке</p>
+          <a
+            href="https://arthurcrm.vercel.app/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке"
+            style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}
+          >
+            Войти в Кармический банк
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   const displayName = profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : user?.email
-  const positionTitle = profile?.positions?.title || 'Сотрудник'
 
-  // Мини‑дашборд
   const activeTasksCount = tasks.length
   const potentialEarn = tasks.reduce((sum, a) => sum + (a.tasks?.reward_karma || 0), 0)
 
@@ -154,9 +188,65 @@ export default function CRM() {
           )}
         </div>
 
-        {/* Основной контент – без изменений */}
+        {/* Основной контент */}
         <div className="main-content">
-          {/* ... всё как в предыдущем index.js ... */}
+          <div className="left-col">
+            <div className="actions">
+              <button className="action-btn primary">Новая сделка</button>
+              <button className="action-btn" onClick={addCall}>Звонок</button>
+              <button className="action-btn">Письмо</button>
+              <button className="action-btn">Встреча</button>
+            </div>
+
+            {tasks.length > 0 && (
+              <div className="panel">
+                <h3>Задания CRM</h3>
+                {tasks.map(assignment => {
+                  const t = assignment.tasks
+                  return (
+                    <div key={assignment.id} className="activity-item" style={{ borderBottom: '1px solid #E5F0E8', padding: '10px 0' }}>
+                      <div className="activity-text">
+                        <span className="font-medium">{t.title}</span>
+                        <div className="text-xs" style={{ color: '#5B7465' }}>Звонков: {calls} из {t.crm_target_count}</div>
+                      </div>
+                      <span className="text-sm" style={{ color: '#4CAF6A', fontWeight: 600 }}>+{t.reward_karma}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="panel">
+              <h3>Воронка продаж</h3>
+              <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width:'80%'}}></div></div><span className="stage-count">12 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Квалификация</span><div className="stage-bar"><div className="stage-fill" style={{width:'55%'}}></div></div><span className="stage-count">8 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Предложение</span><div className="stage-bar"><div className="stage-fill" style={{width:'40%'}}></div></div><span className="stage-count">5 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width:'25%'}}></div></div><span className="stage-count">3 сделки</span></div>
+              <div className="funnel-stage"><span className="stage-name">Закрыто</span><div className="stage-bar"><div className="stage-fill" style={{width:'15%'}}></div></div><span className="stage-count">2 сделки</span></div>
+            </div>
+
+            {/* Активность команды убрана */}
+          </div>
+
+          <div className="right-col">
+            <div className="panel" style={{flex:1, display:'flex', flexDirection:'column'}}>
+              <h3>Цели на сегодня</h3>
+              <div style={{display:'flex', flexDirection:'column', gap:12}}>
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:14}}><span>Звонки</span><span>{calls}/50</span></div>
+                  <div style={{height:8, background:'#F0F7F2', borderRadius:4, marginTop:4}}><div style={{width: `${Math.min(100, (calls/50)*100)}%`, height:'100%', background:'linear-gradient(90deg, #F4B860, #F28B82)', borderRadius:4}}></div></div>
+                </div>
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:14}}><span>Письма</span><span>2/3</span></div>
+                  <div style={{height:8, background:'#F0F7F2', borderRadius:4, marginTop:4}}><div style={{width:'66%', height:'100%', background:'linear-gradient(90deg, #F4B860, #F28B82)', borderRadius:4}}></div></div>
+                </div>
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:14}}><span>Встречи</span><span>1/2</span></div>
+                  <div style={{height:8, background:'#F0F7F2', borderRadius:4, marginTop:4}}><div style={{width:'50%', height:'100%', background:'linear-gradient(90deg, #F4B860, #F28B82)', borderRadius:4}}></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </>
