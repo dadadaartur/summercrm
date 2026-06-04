@@ -62,7 +62,7 @@ export default function CRM() {
     init()
   }, [])
 
-  // Листопад и облака (без изменений)
+  // Листопад и облака
   useEffect(() => {
     const leafContainer = document.getElementById('leafContainer')
     if (!leafContainer) return
@@ -139,7 +139,7 @@ export default function CRM() {
           <h2 style={{ marginBottom: '16px', fontWeight: 600, color: '#2D6A4F' }}>Добро пожаловать в CRM Лето</h2>
           <p style={{ marginBottom: '24px', color: '#5B7465' }}>Для работы с CRM необходимо авторизоваться в Кармическом банке</p>
           <a
-            href={`https://${process.env.NEXT_PUBLIC_BANK_DOMAIN || 'karmabank.ru'}/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке`}
+            href="https://arthurcrm.vercel.app/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке"
             style={{
               display: 'inline-block',
               background: '#4CAF6A',
