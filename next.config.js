@@ -6,10 +6,7 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, max-age=0',
-          },
+          { key: 'Cache-Control', value: 'no-store, max-age=0' },
         ],
       },
     ]
