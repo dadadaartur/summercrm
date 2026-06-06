@@ -23,7 +23,6 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true)
   const [needsLogin, setNeedsLogin] = useState(false)
 
-  // Чат
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sessionId, setSessionId] = useState(null)
@@ -35,14 +34,10 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Панель горячих клавиш
   const [showHotkeys, setShowHotkeys] = useState(false)
-
-  // Вкладки правой панели
   const [rightTab, setRightTab] = useState('templates')
-
-  // Виджет метрик
   const [metrics, setMetrics] = useState({ openDeals: 0, activeGoals: 0 })
+  const [operatorRating, setOperatorRating] = useState(null) // { avg, count }
 
   const showNotification = (msg) => {
     setNotification({ show: true, message: msg })
@@ -64,13 +59,24 @@ export default function ChatPage() {
       if (!profileData?.company_id) { setNeedsLogin(true); setLoading(false); return }
       setProfile(profileData)
 
-      // Загружаем метрики компании
+      // Метрики
       const [{ count: dealsCount }, { count: goalsCount }] = await Promise.all([
         supabase.from('deals').select('*', { count: 'exact', head: true }).eq('company_id', profileData.company_id).in('status', ['new', 'qualification', 'proposal', 'negotiation']),
         supabase.from('goals').select('*', { count: 'exact', head: true }).eq('company_id', profileData.company_id).eq('is_active', true)
       ])
       setMetrics({ openDeals: dealsCount || 0, activeGoals: goalsCount || 0 })
 
+      // Средняя оценка оператора
+      const { data: ratings } = await supabase
+        .from('chat_ratings')
+        .select('rating, chat_sessions!inner(operator_id)')
+        .eq('chat_sessions.operator_id', currentUser.id)
+      if (ratings && ratings.length > 0) {
+        const avg = (ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length).toFixed(1)
+        setOperatorRating({ avg, count: ratings.length })
+      }
+
+      // Клиент
       const clientId = router.query.clientId
       let clientData = DEFAULT_CLIENT
       if (clientId) {
@@ -92,6 +98,7 @@ export default function ChatPage() {
       }
       setClient(clientData)
 
+      // Сессия
       const { data: existingSessions } = await supabase
         .from('chat_sessions')
         .select('id')
@@ -162,12 +169,7 @@ export default function ChatPage() {
       .channel('chat-' + sessionId)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `session_id=eq.${sessionId}`
-        },
+        { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `session_id=eq.${sessionId}` },
         (payload) => {
           setMessages((prev) => {
             if (prev.find(m => m.id === payload.new.id)) return prev
@@ -176,16 +178,11 @@ export default function ChatPage() {
         }
       )
       .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [sessionId])
 
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const sendMessage = useCallback(async () => {
@@ -213,9 +210,7 @@ export default function ChatPage() {
       e.preventDefault()
       sendMessage()
     }
-    if (e.key === 'Escape') {
-      setShowHotkeys(false)
-    }
+    if (e.key === 'Escape') setShowHotkeys(false)
   }
 
   const applyTemplate = (templateText) => {
@@ -269,7 +264,13 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Виджет метрик */}
+      <div className="section-nav">
+        <a href="/">Главная</a>
+        <a href="/deals">Сделки</a>
+        <a href="/chat" className="active">Чат</a>
+        <a href="/planet">Планета Земля</a>
+      </div>
+
       <div className="metrics-widget">
         <div className="metrics-widget-item">
           <div className="metrics-widget-value">{metrics.openDeals}</div>
@@ -282,12 +283,9 @@ export default function ChatPage() {
       </div>
 
       <div className="chat-container">
-        {/* Левая панель */}
         <div className="chat-left-panel">
           <div className="chat-client-header">
-            <div className="chat-client-avatar">
-              {client.name.charAt(0).toUpperCase()}
-            </div>
+            <div className="chat-client-avatar">{client.name.charAt(0).toUpperCase()}</div>
             <div className="chat-client-info">
               <div className="chat-client-name">{client.name}</div>
               <div className="chat-client-status">{client.status}</div>
@@ -303,18 +301,22 @@ export default function ChatPage() {
               }`}>{client.priority}</span>
             </div>
           </div>
+          {operatorRating && (
+            <div className="operator-rating">
+              <span>Моя оценка:</span>
+              <span className="stars">{'★'.repeat(Math.round(operatorRating.avg))}{'☆'.repeat(5 - Math.round(operatorRating.avg))}</span>
+              <span style={{ fontSize: 11, color: '#5B7465' }}>{operatorRating.avg} ({operatorRating.count})</span>
+            </div>
+          )}
         </div>
 
-        {/* Центральная область */}
         <div className="chat-center-panel">
           <div className="chat-messages">
             {hasMore && <div className="chat-load-more" onClick={loadMoreMessages}>Загрузить более ранние сообщения</div>}
             {messages.map(msg => (
               <div key={msg.id} className={`chat-message ${msg.sender_type}`}>
                 <div>{msg.message}</div>
-                <div className="chat-message-time">
-                  {new Date(msg.created_at).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}
-                </div>
+                <div className="chat-message-time">{new Date(msg.created_at).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</div>
               </div>
             ))}
             {clientTyping && <div className="typing-indicator">...печатает</div>}
@@ -322,22 +324,8 @@ export default function ChatPage() {
           </div>
 
           <div className="chat-bottom-panel">
-            <input
-              ref={inputRef}
-              className="chat-input"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => setShowHotkeys(true)}
-              onBlur={() => setTimeout(() => setShowHotkeys(false), 200)}
-              placeholder="Напишите сообщение... (Ctrl+Enter для отправки)"
-              disabled={sending}
-            />
-            <button className="chat-send-btn" onClick={sendMessage} disabled={sending || !input.trim()}>
-              {sending ? '...' : 'Отправить'}
-            </button>
-
-            {/* Панель горячих клавиш */}
+            <input ref={inputRef} className="chat-input" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} onFocus={() => setShowHotkeys(true)} onBlur={() => setTimeout(() => setShowHotkeys(false), 200)} placeholder="Напишите сообщение... (Ctrl+Enter для отправки)" disabled={sending} />
+            <button className="chat-send-btn" onClick={sendMessage} disabled={sending || !input.trim()}>{sending ? '...' : 'Отправить'}</button>
             {showHotkeys && (
               <div className="hotkeys-panel" onMouseDown={(e) => e.preventDefault()}>
                 <button className="hotkey-item" onClick={() => applyTemplate("Здравствуйте! Чем могу помочь?")}>Приветствие</button>
@@ -349,7 +337,6 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Правая панель с вкладками */}
         <div className="chat-right-panel">
           <div className="chat-tabs">
             <button className={`chat-tab ${rightTab === 'templates' ? 'active' : ''}`} onClick={() => setRightTab('templates')}>Шаблоны</button>
@@ -357,8 +344,8 @@ export default function ChatPage() {
           </div>
           {rightTab === 'templates' && (
             <div>
-              <button className="chat-template-btn" onClick={() => applyTemplate("Здравствуйте! Чем могу помочь?")}>Стандартное приветствие</button>
-              <button className="chat-template-btn" onClick={() => applyTemplate("Уточните детали, пожалуйста.")}>Запрос уточнения</button>
+              <button className="chat-template-btn" onClick={() => applyTemplate("Здравствуйте! Чем могу помочь?")}>Приветствие</button>
+              <button className="chat-template-btn" onClick={() => applyTemplate("Уточните детали, пожалуйста.")}>Уточнение</button>
               <button className="chat-template-btn" onClick={() => applyTemplate("Спасибо за обращение! Хорошего дня.")}>Прощание</button>
             </div>
           )}
@@ -372,12 +359,7 @@ export default function ChatPage() {
       </div>
 
       {notification.show && (
-        <div style={{
-          position: 'fixed', top: 20, right: 20, zIndex: 1100,
-          background: 'white', borderRadius: 14, padding: '16px 24px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)', color: '#1F2E23',
-          border: '1px solid #E5F0E8'
-        }}>
+        <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 1100, background: 'white', borderRadius: 14, padding: '16px 24px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', color: '#1F2E23', border: '1px solid #E5F0E8' }}>
           {notification.message}
         </div>
       )}
