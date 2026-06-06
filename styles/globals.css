@@ -19,7 +19,7 @@ input, textarea, [contenteditable="true"] {
   cursor: text !important;
 }
 
-a, button, .action-btn, .wind-btn, .topbar-logo-link {
+a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link {
   cursor: pointer !important;
 }
 
@@ -70,58 +70,44 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   transition: color 0.2s;
 }
 .topbar-name:hover { color: #4CAF6A; }
-.planet-link {
-  font-size: 12px;
-  color: #4CAF6A;
-  cursor: pointer;
-  text-decoration: none;
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(4px);
-  border: 1px solid #E5F0E8;
-  border-radius: 20px;
-  padding: 4px 12px;
-  white-space: nowrap;
-}
-.planet-link:hover { background: white; }
 
-/* Вторая панель с разделами */
-.section-nav {
+/* Вторая навигационная панель */
+.nav-panel {
   position: fixed;
   top: 48px;
   left: 0;
   right: 0;
-  height: 36px;
+  height: 40px;
   background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(4px);
   border-bottom: 1px solid #E5F0E8;
   display: flex;
   align-items: center;
+  gap: 20px;
   padding: 0 24px;
-  gap: 12px;
   z-index: 999;
 }
-.section-nav a {
-  font-size: 13px;
+.nav-link {
+  font-size: 14px;
   font-weight: 500;
   color: #5B7465;
   text-decoration: none;
-  padding: 4px 12px;
+  padding: 6px 14px;
   border-radius: 8px;
   transition: all 0.2s;
 }
-.section-nav a:hover,
-.section-nav a.active {
+.nav-link:hover {
   background: #E5F0E8;
   color: #2D6A4F;
 }
 
-/* Основная обёртка – учёт второй панели */
+/* Основная обёртка */
 .crm-wrapper {
   display: flex;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
-  padding-top: 84px; /* 48 + 36 */
+  padding-top: 88px; /* 48px topbar + 40px nav */
 }
 
 /* Облака и листопад */
@@ -130,9 +116,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   opacity: 0;
   transition: opacity 1s;
 }
-.cloud-bg.active {
-  opacity: 1;
-}
+.cloud-bg.active { opacity: 1; }
 .cloud {
   position: absolute; background: white; border-radius: 50%;
   box-shadow: 0 0 30px rgba(255,255,255,0.6); animation: floatCloud linear 20s;
@@ -156,9 +140,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   opacity: 0;
   transition: opacity 1s;
 }
-.leaf-container.active {
-  opacity: 1;
-}
+.leaf-container.active { opacity: 1; }
 .leaf {
   position: absolute; top: -60px; animation: fall linear forwards; opacity: 0.7;
 }
@@ -175,11 +157,11 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   padding: 20px;
   background: #F2F9F4;
   border-right: 1px solid #E5F0E8;
-  height: calc(100vh - 84px);
+  height: calc(100vh - 88px);
   overflow-y: auto;
   z-index: 4;
   position: sticky;
-  top: 84px;
+  top: 88px;
 }
 .balance-item {
   background: white; border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;
@@ -249,7 +231,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 .wind-btn:hover { background: white; }
 .wind-btn svg { width: 28px; height: 28px; pointer-events: none; }
 
-/* ========== СДЕЛКИ ========== */
+/* ========== СТИЛИ ДЛЯ СДЕЛОК ========== */
 .deal-card {
   background: white;
   border: 1px solid #E5F0E8;
@@ -288,6 +270,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   box-shadow: 0 8px 30px rgba(0,0,0,0.1);
 }
 
+/* Поля ввода */
 .input-field {
   width: 100%;
   padding: 10px 14px;
@@ -304,7 +287,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   box-shadow: 0 0 0 3px rgba(76,175,106,0.1);
 }
 
-/* ========== ЗАГРУЗКА ========== */
+/* ========== АНИМАЦИЯ ЗАГРУЗКИ (ЛИСТОЧЕК) ========== */
 .loading-leaf-container {
   display: flex;
   justify-content: center;
@@ -328,8 +311,12 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 }
 
 @keyframes leaf-pulse {
-  0% { background: radial-gradient(circle at 30% 30%, #7AC78F 0%, #4CAF6A 50%, #A3E0B0 100%); }
-  100% { background: radial-gradient(circle at 30% 30%, #A3E0B0 0%, #7AC78F 50%, #4CAF6A 100%); }
+  0% {
+    background: radial-gradient(circle at 30% 30%, #7AC78F 0%, #4CAF6A 50%, #A3E0B0 100%);
+  }
+  100% {
+    background: radial-gradient(circle at 30% 30%, #A3E0B0 0%, #7AC78F 50%, #4CAF6A 100%);
+  }
 }
 
 @keyframes leaf-swing {
@@ -338,10 +325,10 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   100% { transform: rotate(10deg); }
 }
 
-/* ========== ЧАТ ========== */
+/* ========== СТИЛИ ДЛЯ ЧАТА ========== */
 .chat-container {
   display: flex;
-  height: calc(100vh - 84px);
+  height: calc(100vh - 88px);
   background: #E8F4FD;
   font-family: 'Inter', sans-serif;
   overflow: hidden;
@@ -415,16 +402,21 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 /* Средняя оценка оператора */
 .operator-rating {
   margin-top: 8px;
-  font-size: 13px;
-  color: #2D6A4F;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  padding: 8px;
+  background: #F2F9F4;
+  border-radius: 10px;
+  text-align: center;
 }
 
-.stars {
-  color: #F4B860;
-  letter-spacing: 1px;
+.operator-rating-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #4CAF6A;
+}
+
+.operator-rating-label {
+  font-size: 11px;
+  color: #5B7465;
 }
 
 .chat-center-panel {
@@ -678,9 +670,8 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 /* Виджет метрик (правый верхний угол) */
 .metrics-widget {
   position: fixed;
-  top: 96px; /* ниже второй панели */
+  top: 88px;
   right: 20px;
-  bottom: 120px; /* не перекрывает горячие клавиши */
   z-index: 500;
   background: white;
   border: 1px solid #E5F0E8;
@@ -705,28 +696,6 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 .metrics-widget-label {
   font-size: 11px;
   color: #5B7465;
-}
-
-/* Звёзды оценки */
-.rating-stars {
-  display: flex;
-  gap: 4px;
-  margin-top: 12px;
-}
-
-.star {
-  font-size: 24px;
-  cursor: pointer;
-  color: #E5F0E8;
-  transition: color 0.2s;
-}
-
-.star.filled {
-  color: #F4B860;
-}
-
-.star:hover {
-  color: #F4B860;
 }
 
 /* Адаптивность */
