@@ -1,31 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import Link from 'next/link'
 import { supabase } from '../lib/supabaseClient'
-
-function ActionButton({ children, onClick, primary = false, style = {} }) {
-  return (
-    <button
-      onClick={onClick}
-      className={primary ? 'action-btn primary' : 'action-btn'}
-      style={{
-        padding: '10px 24px',
-        borderRadius: '12px',
-        border: 'none',
-        backgroundColor: primary ? '#4CAF6A' : '#F2F9F4',
-        color: primary ? 'white' : '#5B7465',
-        cursor: 'pointer',
-        fontSize: '14px',
-        fontWeight: 500,
-        transition: 'all 0.2s',
-        ...style
-      }}
-    >
-      {children}
-    </button>
-  )
-}
 
 export default function CRM() {
   const router = useRouter()
@@ -37,19 +13,6 @@ export default function CRM() {
   const [loading, setLoading] = useState(true)
   const [needsLogin, setNeedsLogin] = useState(false)
   const [goals, setGoals] = useState([])
-
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newDeal, setNewDeal] = useState({
-    title: '',
-    description: '',
-    client_name: '',
-    amount: '',
-    priority: 'medium',
-    deadline: '',
-    responsible_user_id: ''
-  })
-
-  const [windActive, setWindActive] = useState(false)
 
   useEffect(() => {
     if (!router.isReady) return
@@ -86,22 +49,7 @@ export default function CRM() {
     const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
     if (savedCalls) setCalls(parseInt(savedCalls))
     setLoading(false)
-
-    const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
-    return () => clearTimeout(timeout)
   }
-
-  useEffect(() => {
-    if (!windActive) return
-    const timer = setTimeout(() => setWindActive(false), 20000)
-    return () => clearTimeout(timer)
-  }, [windActive])
-
-  useEffect(() => {
-    if (windActive) return
-    const interval = setInterval(() => setWindActive(true), 10 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [windActive])
 
   const addProgress = async (goalId, currentVal) => {
     const newVal = currentVal + 1
@@ -146,36 +94,7 @@ export default function CRM() {
     if (updatedAssignments) setTasks(updatedAssignments)
   }
 
-  const handleCreateDeal = async () => {
-    if (!newDeal.title.trim()) return
-    const { error } = await supabase.from('deals').insert({
-      company_id: profile.company_id,
-      title: newDeal.title,
-      description: newDeal.description,
-      client_name: newDeal.client_name,
-      amount: parseFloat(newDeal.amount) || null,
-      priority: newDeal.priority,
-      deadline: newDeal.deadline || null,
-      responsible_user_id: newDeal.responsible_user_id || null,
-      status: 'new',
-      progress: 0
-    })
-    if (error) {
-      alert('Ошибка создания сделки')
-      return
-    }
-    setShowCreateModal(false)
-    setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
-    alert('Сделка создана')
-  }
-
-  if (loading) {
-    return (
-      <div className="loading-leaf-container">
-        <div className="loading-leaf"></div>
-      </div>
-    )
-  }
+  if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
 
   if (needsLogin) {
     return (
@@ -183,7 +102,8 @@ export default function CRM() {
         <div style={{ textAlign: 'center', background: 'white', padding: '48px', borderRadius: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <h2 style={{ marginBottom: '16px', fontWeight: 600, color: '#2D6A4F' }}>Добро пожаловать в CRM Лето</h2>
           <p style={{ marginBottom: '24px', color: '#5B7465' }}>Для работы с CRM необходимо авторизоваться в Кармическом банке</p>
-          <a href="https://arthurcrm.vercel.app/login" style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}>
+          <a href="https://arthurcrm.vercel.app/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке"
+             style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}>
             Войти в Кармический банк
           </a>
         </div>
@@ -192,46 +112,122 @@ export default function CRM() {
   }
 
   const displayName = profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : user?.email
+  const activeTasksCount = tasks.length
+  const potentialEarn = tasks.reduce((sum, a) => sum + (a.tasks?.reward_karma || 0), 0)
 
   return (
     <>
       <div className="crm-topbar">
-        <Link href="/" className="topbar-logo-link">
-          <span className="back-arrow">←</span> CRM Лето
-        </Link>
+        <div className="topbar-logo">CRM Лето</div>
         <div className="topbar-right">
-          <span className="topbar-name">{displayName}</span>
+          <a className="planet-link" href="/planet">Моя любимая планета Земля</a>
+          <a className="topbar-name" href="https://arthurcrm.vercel.app/profile" target="_blank" rel="noopener noreferrer">{displayName}</a>
         </div>
-      </div>
-
-      <div className="nav-panel">
-        <Link href="/deals" className="nav-link">Сделки</Link>
-        <Link href="/chat" className="nav-link">Чат</Link>
-        <span className="nav-link" style={{ cursor: 'pointer' }}>Звонки</span>
       </div>
 
       <div className="crm-wrapper">
         <Head>
           <title>CRM Лето</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         </Head>
 
-        <div className={`cloud-bg ${windActive ? 'active' : ''}`}>
+        <div className="cloud-bg">
           <div className="cloud cloud1"></div>
           <div className="cloud cloud2"></div>
           <div className="cloud cloud3"></div>
         </div>
-        <div className={`leaf-container ${windActive ? 'active' : ''}`} />
+        <div className="leaf-container" id="leafContainer" />
+        <div className="wind-btn" id="windButton" title="Вызвать лёгкий ветер">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2C12 2 6 7 6 12C6 17 12 20 12 20C12 20 18 17 18 12C18 7 12 2 12 2Z" strokeLinecap="round"/>
+            <line x1="12" y1="20" x2="12" y2="22" strokeLinecap="round"/>
+          </svg>
+        </div>
 
         <div className="sidebar">
-          {/* баланс и мини-дашборд без изменений */}
-          <div className="balance-item">...</div>
-          <div className="dash-mini">...</div>
-          {goals.length > 0 && (<div className="dash-mini">...</div>)}
+          <div className="balance-item">
+            <div className="balance-icon">
+              <svg viewBox="0 0 32 32" fill="none"><path d="M16 4C16 4 8 10 8 18C8 26 16 28 16 28C16 28 24 26 24 18C24 10 16 4 16 4Z" stroke="#4CAF6A" strokeWidth="2" fill="#A3E0B0" fillOpacity="0.3"/><path d="M13 12L16 15L19 12" stroke="#4CAF6A" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </div>
+            <div className="balance-info"><span className="balance-value karma-color">{balance}</span><span className="balance-label">Кармики</span></div>
+          </div>
+
+          <div className="dash-mini">
+            <div className="dash-row"><span>Заданий CRM</span><span>{activeTasksCount}</span></div>
+            <div className="dash-row"><span>Можно заработать</span><span style={{color:'#4CAF6A'}}>+{potentialEarn}</span></div>
+            <div className="dash-row"><span>Звонков сегодня</span><span>{calls}</span></div>
+          </div>
+
+          {goals.length > 0 && (
+            <div className="dash-mini">
+              {goals.map(goal => (
+                <div key={goal.id} className="dash-row">
+                  <span>{goal.title} ({goal.period})</span>
+                  <span>{goal.current_value}/{goal.target_value}</span>
+                  <button onClick={() => addProgress(goal.id, goal.current_value)} className="text-xs text-green-400 hover:text-green-300 ml-2">+</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="main-content">
-          {/* здесь твоя основная вёрстка главной страницы (воронка, задания, цели) */}
+          <div className="left-col">
+            <div className="actions">
+              <button className="action-btn primary">Новая сделка</button>
+              <button className="action-btn" onClick={addCall}>Звонок</button>
+              <button className="action-btn">Письмо</button>
+              <button className="action-btn">Встреча</button>
+            </div>
+
+            {tasks.length > 0 && (
+              <div className="panel">
+                <h3>Задания CRM</h3>
+                {tasks.map(assignment => {
+                  const t = assignment.tasks
+                  return (
+                    <div key={assignment.id} className="activity-item" style={{ borderBottom: '1px solid #E5F0E8', padding: '10px 0' }}>
+                      <div className="activity-text">
+                        <span className="font-medium">{t.title}</span>
+                        <div className="text-xs" style={{ color: '#5B7465' }}>Звонков: {calls} из {t.crm_target_count}</div>
+                      </div>
+                      <span className="text-sm" style={{ color: '#4CAF6A', fontWeight: 600 }}>+{t.reward_karma}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="panel">
+              <h3>Воронка продаж</h3>
+              <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width:'80%'}}></div></div><span className="stage-count">12 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Квалификация</span><div className="stage-bar"><div className="stage-fill" style={{width:'55%'}}></div></div><span className="stage-count">8 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Предложение</span><div className="stage-bar"><div className="stage-fill" style={{width:'40%'}}></div></div><span className="stage-count">5 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width:'25%'}}></div></div><span className="stage-count">3 сделки</span></div>
+              <div className="funnel-stage"><span className="stage-name">Закрыто</span><div className="stage-bar"><div className="stage-fill" style={{width:'15%'}}></div></div><span className="stage-count">2 сделки</span></div>
+            </div>
+          </div>
+
+          <div className="right-col">
+            <div className="panel" style={{flex:1, display:'flex', flexDirection:'column'}}>
+              <h3>Цели на сегодня</h3>
+              <div style={{display:'flex', flexDirection:'column', gap:12}}>
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:14}}><span>Звонки</span><span>{calls}/50</span></div>
+                  <div style={{height:8, background:'#F0F7F2', borderRadius:4, marginTop:4}}><div style={{width: `${Math.min(100, (calls/50)*100)}%`, height:'100%', background:'linear-gradient(90deg, #F4B860, #F28B82)', borderRadius:4}}></div></div>
+                </div>
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:14}}><span>Письма</span><span>2/3</span></div>
+                  <div style={{height:8, background:'#F0F7F2', borderRadius:4, marginTop:4}}><div style={{width:'66%', height:'100%', background:'linear-gradient(90deg, #F4B860, #F28B82)', borderRadius:4}}></div></div>
+                </div>
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:14}}><span>Встречи</span><span>1/2</span></div>
+                  <div style={{height:8, background:'#F0F7F2', borderRadius:4, marginTop:4}}><div style={{width:'50%', height:'100%', background:'linear-gradient(90deg, #F4B860, #F28B82)', borderRadius:4}}></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </>
