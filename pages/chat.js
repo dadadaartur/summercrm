@@ -28,6 +28,15 @@ function formatDateSeparator(dateStr) {
   return date.toLocaleDateString('ru')
 }
 
+// SVG иконка молнии
+function LightningIcon({ size = 20, color = '#F4B860' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill={color} fillOpacity="0.3" />
+    </svg>
+  )
+}
+
 export default function ChatPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -54,7 +63,7 @@ export default function ChatPage() {
   })
   const [operatorAvgRating, setOperatorAvgRating] = useState(0)
 
-  const [showHotkeys, setShowHotkeys] = useState(false)
+  const [showQuickTemplates, setShowQuickTemplates] = useState(false)
   const [rightTab, setRightTab] = useState('templates')
   const [metrics, setMetrics] = useState({ openDeals: 0, activeGoals: 0 })
 
@@ -253,7 +262,7 @@ export default function ChatPage() {
     })
     if (!error) {
       setInput('')
-      setShowHotkeys(false)
+      setShowQuickTemplates(false)
       refreshSessionStats()
     } else {
       showNotification('Ошибка отправки сообщения')
@@ -265,17 +274,14 @@ export default function ChatPage() {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       sendMessage()
-    } else if (e.key === '/' && input === '') {
-      e.preventDefault()
-      setShowHotkeys(true)
     } else if (e.key === 'Escape') {
-      setShowHotkeys(false)
+      setShowQuickTemplates(false)
     }
   }
 
   const applyTemplate = (text) => {
     setInput(text)
-    setShowHotkeys(false)
+    setShowQuickTemplates(false)
     inputRef.current?.focus()
   }
 
@@ -429,6 +435,7 @@ export default function ChatPage() {
             </div>
           </div>
 
+          {/* Статистика сессии */}
           <div className="chat-metrics">
             <div className="chat-metrics-item">
               <span>Всего сообщений</span>
@@ -498,14 +505,20 @@ export default function ChatPage() {
           </div>
 
           <div className="chat-bottom-panel">
+            <button
+              className="quick-templates-btn"
+              onClick={() => setShowQuickTemplates(!showQuickTemplates)}
+              title="Быстрые ответы"
+            >
+              <LightningIcon size={20} />
+            </button>
+
             <input
               ref={inputRef}
               className="chat-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              onFocus={() => setShowHotkeys(true)}
-              onBlur={() => setTimeout(() => setShowHotkeys(false), 200)}
               placeholder="Напишите сообщение... (Ctrl+Enter для отправки)"
               disabled={sending}
             />
@@ -513,18 +526,18 @@ export default function ChatPage() {
               {sending ? '...' : 'Отправить'}
             </button>
 
-            {showHotkeys && (
-              <div className="hotkeys-panel" onMouseDown={(e) => e.preventDefault()}>
-                <button className="hotkey-item" onClick={() => applyTemplate("Здравствуйте! Чем могу помочь?")}>
+            {showQuickTemplates && (
+              <div className="quick-templates-panel">
+                <button className="quick-template-btn" onClick={() => applyTemplate("Здравствуйте! Чем могу помочь?")}>
                   Приветствие
                 </button>
-                <button className="hotkey-item" onClick={() => applyTemplate("Уточните детали, пожалуйста.")}>
+                <button className="quick-template-btn" onClick={() => applyTemplate("Уточните детали, пожалуйста.")}>
                   Уточнение
                 </button>
-                <button className="hotkey-item" onClick={() => applyTemplate("Спасибо за обращение! Хорошего дня.")}>
+                <button className="quick-template-btn" onClick={() => applyTemplate("Спасибо за обращение! Хорошего дня.")}>
                   Прощание
                 </button>
-                <button className="hotkey-item" onClick={() => setShowHotkeys(false)}>
+                <button className="quick-template-btn" onClick={() => setShowQuickTemplates(false)}>
                   Закрыть
                 </button>
               </div>
