@@ -3,7 +3,6 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { supabase } from '../lib/supabaseClient'
 
-// Заглушка клиента, если не передан clientId в URL
 const DEFAULT_CLIENT = {
   id: '00000000-0000-0000-0000-000000000000',
   name: 'Клиент',
@@ -13,7 +12,6 @@ const DEFAULT_CLIENT = {
   priority: 'medium'
 }
 
-// Простейшая санитизация текста (удаление HTML-тегов)
 function sanitize(text) {
   return text.replace(/<[^>]*>/g, '')
 }
@@ -25,7 +23,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true)
   const [needsLogin, setNeedsLogin] = useState(false)
 
-  // Состояния чата
+  // Чат
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sessionId, setSessionId] = useState(null)
@@ -35,15 +33,22 @@ export default function ChatPage() {
   const [hasMore, setHasMore] = useState(true)
   const [notification, setNotification] = useState({ show: false, message: '' })
   const messagesEndRef = useRef(null)
-  const messagesStartRef = useRef(null) // для скролла при подгрузке старых
+  const inputRef = useRef(null)
 
-  // Отобразить уведомление на 3 секунды
+  // Панель горячих клавиш
+  const [showHotkeys, setShowHotkeys] = useState(false)
+
+  // Вкладки правой панели
+  const [rightTab, setRightTab] = useState('templates')
+
+  // Виджет метрик
+  const [metrics, setMetrics] = useState({ openDeals: 0, activeGoals: 0 })
+
   const showNotification = (msg) => {
     setNotification({ show: true, message: msg })
     setTimeout(() => setNotification({ show: false, message: '' }), 3000)
   }
 
-  // Загрузка профиля и инициализация сессии
   useEffect(() => {
     const init = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser()
@@ -59,7 +64,13 @@ export default function ChatPage() {
       if (!profileData?.company_id) { setNeedsLogin(true); setLoading(false); return }
       setProfile(profileData)
 
-      // Определяем клиента: из URL или заглушка
+      // Загружаем метрики компании
+      const [{ count: dealsCount }, { count: goalsCount }] = await Promise.all([
+        supabase.from('deals').select('*', { count: 'exact', head: true }).eq('company_id', profileData.company_id).in('status', ['new', 'qualification', 'proposal', 'negotiation']),
+        supabase.from('goals').select('*', { count: 'exact', head: true }).eq('company_id', profileData.company_id).eq('is_active', true)
+      ])
+      setMetrics({ openDeals: dealsCount || 0, activeGoals: goalsCount || 0 })
+
       const clientId = router.query.clientId
       let clientData = DEFAULT_CLIENT
       if (clientId) {
@@ -81,7 +92,6 @@ export default function ChatPage() {
       }
       setClient(clientData)
 
-      // Создаём или находим активную сессию с этим клиентом
       const { data: existingSessions } = await supabase
         .from('chat_sessions')
         .select('id')
@@ -115,7 +125,6 @@ export default function ChatPage() {
     init()
   }, [router.query.clientId])
 
-  // Загрузка сообщений (последние 30)
   const loadMessages = async (sid) => {
     const { data } = await supabase
       .from('chat_messages')
@@ -129,7 +138,6 @@ export default function ChatPage() {
     }
   }
 
-  // Подгрузка более старых сообщений
   const loadMoreMessages = async () => {
     if (!sessionId || messages.length === 0) return
     const oldest = messages[0]
@@ -148,7 +156,6 @@ export default function ChatPage() {
     }
   }
 
-  // Подписка на новые сообщения в реальном времени
   useEffect(() => {
     if (!sessionId) return
     const channel = supabase
@@ -163,7 +170,6 @@ export default function ChatPage() {
         },
         (payload) => {
           setMessages((prev) => {
-            // избегаем дублирования
             if (prev.find(m => m.id === payload.new.id)) return prev
             return [...prev, payload.new]
           })
@@ -176,14 +182,12 @@ export default function ChatPage() {
     }
   }, [sessionId])
 
-  // Автоскролл вниз при новом сообщении
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [messages])
 
-  // Отправка сообщения
   const sendMessage = useCallback(async () => {
     if (!input.trim() || !sessionId || !user) return
     setSending(true)
@@ -197,31 +201,29 @@ export default function ChatPage() {
     })
     if (!error) {
       setInput('')
+      setShowHotkeys(false)
     } else {
       showNotification('Ошибка отправки сообщения')
     }
     setSending(false)
   }, [input, sessionId, user])
 
-  // Горячие клавиши
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       sendMessage()
-    } else if (e.key === '/' && input === '') {
-      e.preventDefault()
-      // Открыть поиск шаблонов (здесь просто фокус на первом шаблоне)
-      const firstTemplate = document.querySelector('.chat-template-btn')
-      if (firstTemplate) firstTemplate.focus()
+    }
+    if (e.key === 'Escape') {
+      setShowHotkeys(false)
     }
   }
 
-  // Вставка шаблона
   const applyTemplate = (templateText) => {
     setInput(templateText)
+    setShowHotkeys(false)
+    inputRef.current?.focus()
   }
 
-  // Действия (заглушка)
   const createDealFromChat = () => {
     showNotification('Создание сделки будет добавлено')
   }
@@ -267,6 +269,18 @@ export default function ChatPage() {
         </div>
       </div>
 
+      {/* Виджет метрик */}
+      <div className="metrics-widget">
+        <div className="metrics-widget-item">
+          <div className="metrics-widget-value">{metrics.openDeals}</div>
+          <div className="metrics-widget-label">открытых сделок</div>
+        </div>
+        <div className="metrics-widget-item">
+          <div className="metrics-widget-value">{metrics.activeGoals}</div>
+          <div className="metrics-widget-label">активных целей</div>
+        </div>
+      </div>
+
       <div className="chat-container">
         {/* Левая панель */}
         <div className="chat-left-panel">
@@ -279,24 +293,14 @@ export default function ChatPage() {
               <div className="chat-client-status">{client.status}</div>
             </div>
           </div>
-
           <div className="chat-metrics">
-            <div className="chat-metrics-item">
-              <span>Телефон</span>
-              <span>{client.phone || '—'}</span>
-            </div>
-            <div className="chat-metrics-item">
-              <span>Email</span>
-              <span>{client.email || '—'}</span>
-            </div>
+            <div className="chat-metrics-item"><span>Телефон</span><span>{client.phone || '—'}</span></div>
+            <div className="chat-metrics-item"><span>Email</span><span>{client.email || '—'}</span></div>
             <div className="chat-metrics-item">
               <span>Приоритет</span>
               <span className={`px-2 py-1 rounded-full text-white text-xs ${
-                client.priority === 'high' ? 'bg-[#F28B82]' :
-                client.priority === 'urgent' ? 'bg-[#EF4444]' : 'bg-[#7AC78F]'
-              }`}>
-                {client.priority}
-              </span>
+                client.priority === 'high' ? 'bg-[#F28B82]' : client.priority === 'urgent' ? 'bg-[#EF4444]' : 'bg-[#7AC78F]'
+              }`}>{client.priority}</span>
             </div>
           </div>
         </div>
@@ -304,11 +308,7 @@ export default function ChatPage() {
         {/* Центральная область */}
         <div className="chat-center-panel">
           <div className="chat-messages">
-            {hasMore && (
-              <div className="chat-load-more" onClick={loadMoreMessages}>
-                Загрузить более ранние сообщения
-              </div>
-            )}
+            {hasMore && <div className="chat-load-more" onClick={loadMoreMessages}>Загрузить более ранние сообщения</div>}
             {messages.map(msg => (
               <div key={msg.id} className={`chat-message ${msg.sender_type}`}>
                 <div>{msg.message}</div>
@@ -323,42 +323,54 @@ export default function ChatPage() {
 
           <div className="chat-bottom-panel">
             <input
+              ref={inputRef}
               className="chat-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={() => setShowHotkeys(true)}
+              onBlur={() => setTimeout(() => setShowHotkeys(false), 200)}
               placeholder="Напишите сообщение... (Ctrl+Enter для отправки)"
               disabled={sending}
             />
             <button className="chat-send-btn" onClick={sendMessage} disabled={sending || !input.trim()}>
               {sending ? '...' : 'Отправить'}
             </button>
+
+            {/* Панель горячих клавиш */}
+            {showHotkeys && (
+              <div className="hotkeys-panel" onMouseDown={(e) => e.preventDefault()}>
+                <button className="hotkey-item" onClick={() => applyTemplate("Здравствуйте! Чем могу помочь?")}>Приветствие</button>
+                <button className="hotkey-item" onClick={() => applyTemplate("Уточните детали, пожалуйста.")}>Уточнение</button>
+                <button className="hotkey-item" onClick={() => applyTemplate("Спасибо за обращение! Хорошего дня.")}>Прощание</button>
+                <button className="hotkey-item" onClick={() => setShowHotkeys(false)}>Закрыть</button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Правая панель */}
+        {/* Правая панель с вкладками */}
         <div className="chat-right-panel">
-          <div>
-            <div className="chat-templates-title">Шаблоны</div>
-            <button className="chat-template-btn" onClick={() => applyTemplate("Здравствуйте! Чем могу помочь?")}>
-              Стандартное приветствие
-            </button>
-            <button className="chat-template-btn" onClick={() => applyTemplate("Уточните детали, пожалуйста.")}>
-              Запрос уточнения
-            </button>
-            <button className="chat-template-btn" onClick={() => applyTemplate("Спасибо за обращение! Хорошего дня.")}>
-              Прощание
-            </button>
+          <div className="chat-tabs">
+            <button className={`chat-tab ${rightTab === 'templates' ? 'active' : ''}`} onClick={() => setRightTab('templates')}>Шаблоны</button>
+            <button className={`chat-tab ${rightTab === 'actions' ? 'active' : ''}`} onClick={() => setRightTab('actions')}>Действия</button>
           </div>
-          <div>
-            <button className="chat-action-btn" onClick={createDealFromChat}>
-              Создать сделку
-            </button>
-          </div>
+          {rightTab === 'templates' && (
+            <div>
+              <button className="chat-template-btn" onClick={() => applyTemplate("Здравствуйте! Чем могу помочь?")}>Стандартное приветствие</button>
+              <button className="chat-template-btn" onClick={() => applyTemplate("Уточните детали, пожалуйста.")}>Запрос уточнения</button>
+              <button className="chat-template-btn" onClick={() => applyTemplate("Спасибо за обращение! Хорошего дня.")}>Прощание</button>
+            </div>
+          )}
+          {rightTab === 'actions' && (
+            <div>
+              <button className="chat-action-btn" onClick={createDealFromChat}>Создать сделку</button>
+              <button className="chat-action-btn" style={{ background: '#F2F9F4', color: '#2D6A4F' }}>Назначить встречу</button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Уведомление */}
       {notification.show && (
         <div style={{
           position: 'fixed', top: 20, right: 20, zIndex: 1100,
