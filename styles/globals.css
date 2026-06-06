@@ -286,6 +286,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 .loading-leaf {
   width: 90px;
   height: 90px;
+  background: #4CAF6A; /* фолбэк */
   background: radial-gradient(circle at 30% 30%, #7AC78F 0%, #4CAF6A 50%, #A3E0B0 100%);
   clip-path: path('M50,10 C30,20 20,50 50,70 C80,50 70,20 50,10 Z');
   animation:
@@ -540,11 +541,28 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   background: #388E3C;
 }
 
+.chat-send-btn:disabled {
+  background: #A3E0B0;
+  cursor: not-allowed;
+}
+
 .typing-indicator {
   font-size: 12px;
   color: #5B7465;
   font-style: italic;
   padding: 4px 12px;
+}
+
+.chat-load-more {
+  text-align: center;
+  padding: 8px;
+  color: #4CAF6A;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chat-load-more:hover {
+  text-decoration: underline;
 }
 
 /* Адаптивность */
