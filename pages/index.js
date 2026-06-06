@@ -3,6 +3,29 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { supabase } from '../lib/supabaseClient'
 
+function ActionButton({ children, onClick, primary = false, style = {} }) {
+  return (
+    <button
+      onClick={onClick}
+      className={primary ? 'action-btn primary' : 'action-btn'}
+      style={{
+        padding: '10px 24px',
+        borderRadius: '12px',
+        border: 'none',
+        backgroundColor: primary ? '#4CAF6A' : '#F2F9F4',
+        color: primary ? 'white' : '#5B7465',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: 500,
+        transition: 'all 0.2s',
+        ...style
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 export default function CRM() {
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -13,6 +36,21 @@ export default function CRM() {
   const [loading, setLoading] = useState(true)
   const [needsLogin, setNeedsLogin] = useState(false)
   const [goals, setGoals] = useState([])
+
+  // Состояния для модального окна создания сделки
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newDeal, setNewDeal] = useState({
+    title: '',
+    description: '',
+    client_name: '',
+    amount: '',
+    priority: 'medium',
+    deadline: '',
+    responsible_user_id: ''
+  })
+
+  // Состояние для облаков (раз в 10 минут)
+  const [windActive, setWindActive] = useState(false)
 
   useEffect(() => {
     if (!router.isReady) return
@@ -49,7 +87,24 @@ export default function CRM() {
     const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
     if (savedCalls) setCalls(parseInt(savedCalls))
     setLoading(false)
+
+    // Первый запуск облаков через 10 минут
+    const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
+    return () => clearTimeout(timeout)
   }
+
+  // Управление облаками
+  useEffect(() => {
+    if (!windActive) return
+    const timer = setTimeout(() => setWindActive(false), 20000)
+    return () => clearTimeout(timer)
+  }, [windActive])
+
+  useEffect(() => {
+    if (windActive) return
+    const interval = setInterval(() => setWindActive(true), 10 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [windActive])
 
   const addProgress = async (goalId, currentVal) => {
     const newVal = currentVal + 1
@@ -94,42 +149,28 @@ export default function CRM() {
     if (updatedAssignments) setTasks(updatedAssignments)
   }
 
-  // ===== ЛИСТОПАД И ОБЛАКА =====
-  useEffect(() => {
-    const leafContainer = document.getElementById('leafContainer')
-    if (!leafContainer) return
-    let leafInterval
-
-    function createLeaf() {
-      const leaf = document.createElementNS("http://www.w3.org/2000/svg", "svg")
-      leaf.setAttribute("viewBox", "0 0 30 30")
-      leaf.classList.add("leaf")
-      leaf.style.left = Math.random() * 100 + "%"
-      const duration = 8 + Math.random() * 4
-      leaf.style.animationDuration = duration + "s"
-      const size = Math.random() * 22 + 18
-      leaf.setAttribute("width", size)
-      leaf.setAttribute("height", size)
-      const colors = ['#7AC78F', '#4CAF6A', '#A3E0B0', '#F4B860', '#F28B82', '#FFD700']
-      leaf.innerHTML = `<path d="M15 3C15 3 7 9 7 16C7 23 15 26 15 26C15 26 23 23 23 16C23 9 15 3 15 3Z" fill="${colors[Math.floor(Math.random() * colors.length)]}" opacity="0.8" stroke="#4CAF6A" stroke-width="1.5"/><line x1="15" y1="26" x2="15" y2="29" stroke="#4CAF6A" stroke-width="1.5"/>`
-      leafContainer.appendChild(leaf)
-      setTimeout(() => { if (leaf.parentNode) leaf.remove() }, duration * 1000 + 500)
+  const handleCreateDeal = async () => {
+    if (!newDeal.title.trim()) return
+    const { error } = await supabase.from('deals').insert({
+      company_id: profile.company_id,
+      title: newDeal.title,
+      description: newDeal.description,
+      client_name: newDeal.client_name,
+      amount: parseFloat(newDeal.amount) || null,
+      priority: newDeal.priority,
+      deadline: newDeal.deadline || null,
+      responsible_user_id: newDeal.responsible_user_id || null,
+      status: 'new',
+      progress: 0
+    })
+    if (error) {
+      alert('Ошибка создания сделки')
+      return
     }
-
-    leafInterval = setInterval(createLeaf, 200)
-    setTimeout(() => clearInterval(leafInterval), 5000)
-
-    const windButton = document.getElementById('windButton')
-    if (windButton) {
-      windButton.onclick = () => {
-        clearInterval(leafInterval)
-        leafInterval = setInterval(createLeaf, 150)
-        setTimeout(() => clearInterval(leafInterval), 10000)
-      }
-    }
-
-    return () => clearInterval(leafInterval)
-  }, [])
+    setShowCreateModal(false)
+    setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
+    alert('Сделка создана')
+  }
 
   if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
 
@@ -155,10 +196,11 @@ export default function CRM() {
   return (
     <>
       <div className="crm-topbar">
-        <div className="topbar-logo">CRM Лето</div>
+        <a href="/" className="topbar-logo-link">
+          <span className="back-arrow">←</span> CRM Лето
+        </a>
         <div className="topbar-right">
           <a className="planet-link" href="/planet">Моя любимая планета Земля</a>
-          <a href="/deals" style={{ marginLeft: 12, background: 'transparent', color: '#4CAF6A', border: '1px solid #4CAF6A', borderRadius: 8, padding: '6px 14px', fontSize: 13, textDecoration: 'none' }}>Сделки</a>
           <a className="topbar-name" href="https://arthurcrm.vercel.app/profile" target="_blank" rel="noopener noreferrer">{displayName}</a>
         </div>
       </div>
@@ -170,13 +212,14 @@ export default function CRM() {
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         </Head>
 
-        <div className="cloud-bg">
+        <div className={`cloud-bg ${windActive ? 'active' : ''}`}>
           <div className="cloud cloud1"></div>
           <div className="cloud cloud2"></div>
           <div className="cloud cloud3"></div>
         </div>
-        <div className="leaf-container" id="leafContainer" />
-        <div className="wind-btn" id="windButton" title="Вызвать лёгкий ветер">
+        <div className={`leaf-container ${windActive ? 'active' : ''}`} />
+
+        <div className="wind-btn" onClick={() => setWindActive(true)} title="Вызвать лёгкий ветер">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 2C12 2 6 7 6 12C6 17 12 20 12 20C12 20 18 17 18 12C18 7 12 2 12 2Z" strokeLinecap="round"/>
             <line x1="12" y1="20" x2="12" y2="22" strokeLinecap="round"/>
@@ -213,7 +256,7 @@ export default function CRM() {
         <div className="main-content">
           <div className="left-col">
             <div className="actions">
-              <button className="action-btn primary">Новая сделка</button>
+              <button className="action-btn primary" onClick={() => setShowCreateModal(true)}>Новая сделка</button>
               <button className="action-btn" onClick={addCall}>Звонок</button>
               <button className="action-btn">Письмо</button>
               <button className="action-btn">Встреча</button>
@@ -268,6 +311,34 @@ export default function CRM() {
           </div>
         </div>
       </div>
+
+      {/* Модальное окно создания сделки */}
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 20, fontWeight: 600, color: '#1F2E23', marginBottom: 20 }}>Новая сделка</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input className="input-field" placeholder="Название сделки" value={newDeal.title} onChange={e => setNewDeal({...newDeal, title: e.target.value})} />
+              <textarea className="input-field" rows={2} placeholder="Описание" value={newDeal.description} onChange={e => setNewDeal({...newDeal, description: e.target.value})} />
+              <input className="input-field" placeholder="Клиент" value={newDeal.client_name} onChange={e => setNewDeal({...newDeal, client_name: e.target.value})} />
+              <input className="input-field" type="number" placeholder="Сумма" value={newDeal.amount} onChange={e => setNewDeal({...newDeal, amount: e.target.value})} />
+              <div style={{ display: 'flex', gap: 12 }}>
+                <select className="input-field" value={newDeal.priority} onChange={e => setNewDeal({...newDeal, priority: e.target.value})}>
+                  <option value="low">Низкий</option>
+                  <option value="medium">Средний</option>
+                  <option value="high">Высокий</option>
+                  <option value="urgent">Критичный</option>
+                </select>
+                <input className="input-field" type="date" value={newDeal.deadline} onChange={e => setNewDeal({...newDeal, deadline: e.target.value})} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>
+                <ActionButton onClick={() => setShowCreateModal(false)}>Отмена</ActionButton>
+                <ActionButton primary onClick={handleCreateDeal}>Создать</ActionButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
