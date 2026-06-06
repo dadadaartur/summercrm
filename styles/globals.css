@@ -84,16 +84,47 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 }
 .planet-link:hover { background: white; }
 
-/* Основная обёртка */
+/* Вторая панель с разделами */
+.section-nav {
+  position: fixed;
+  top: 48px;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid #E5F0E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+  z-index: 999;
+}
+.section-nav a {
+  font-size: 13px;
+  font-weight: 500;
+  color: #5B7465;
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.section-nav a:hover,
+.section-nav a.active {
+  background: #E5F0E8;
+  color: #2D6A4F;
+}
+
+/* Основная обёртка – учёт второй панели */
 .crm-wrapper {
   display: flex;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
-  padding-top: 48px;
+  padding-top: 84px; /* 48 + 36 */
 }
 
-/* Облака и листопад – скрыты, появляются на 20 секунд каждые 10 минут */
+/* Облака и листопад */
 .cloud-bg {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;
   opacity: 0;
@@ -144,11 +175,11 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   padding: 20px;
   background: #F2F9F4;
   border-right: 1px solid #E5F0E8;
-  height: calc(100vh - 48px);
+  height: calc(100vh - 84px);
   overflow-y: auto;
   z-index: 4;
   position: sticky;
-  top: 48px;
+  top: 84px;
 }
 .balance-item {
   background: white; border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;
@@ -218,7 +249,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 .wind-btn:hover { background: white; }
 .wind-btn svg { width: 28px; height: 28px; pointer-events: none; }
 
-/* ========== СТИЛИ ДЛЯ СДЕЛОК ========== */
+/* ========== СДЕЛКИ ========== */
 .deal-card {
   background: white;
   border: 1px solid #E5F0E8;
@@ -257,7 +288,6 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   box-shadow: 0 8px 30px rgba(0,0,0,0.1);
 }
 
-/* Поля ввода */
 .input-field {
   width: 100%;
   padding: 10px 14px;
@@ -274,7 +304,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   box-shadow: 0 0 0 3px rgba(76,175,106,0.1);
 }
 
-/* ========== АНИМАЦИЯ ЗАГРУЗКИ (ЛИСТОЧЕК) ========== */
+/* ========== ЗАГРУЗКА ========== */
 .loading-leaf-container {
   display: flex;
   justify-content: center;
@@ -298,12 +328,8 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 }
 
 @keyframes leaf-pulse {
-  0% {
-    background: radial-gradient(circle at 30% 30%, #7AC78F 0%, #4CAF6A 50%, #A3E0B0 100%);
-  }
-  100% {
-    background: radial-gradient(circle at 30% 30%, #A3E0B0 0%, #7AC78F 50%, #4CAF6A 100%);
-  }
+  0% { background: radial-gradient(circle at 30% 30%, #7AC78F 0%, #4CAF6A 50%, #A3E0B0 100%); }
+  100% { background: radial-gradient(circle at 30% 30%, #A3E0B0 0%, #7AC78F 50%, #4CAF6A 100%); }
 }
 
 @keyframes leaf-swing {
@@ -312,10 +338,10 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   100% { transform: rotate(10deg); }
 }
 
-/* ========== СТИЛИ ДЛЯ ЧАТА ========== */
+/* ========== ЧАТ ========== */
 .chat-container {
   display: flex;
-  height: calc(100vh - 48px);
+  height: calc(100vh - 84px);
   background: #E8F4FD;
   font-family: 'Inter', sans-serif;
   overflow: hidden;
@@ -384,6 +410,21 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 .chat-metrics-item span:last-child {
   font-weight: 600;
   color: #1F2E23;
+}
+
+/* Средняя оценка оператора */
+.operator-rating {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #2D6A4F;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stars {
+  color: #F4B860;
+  letter-spacing: 1px;
 }
 
 .chat-center-panel {
@@ -637,8 +678,9 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 /* Виджет метрик (правый верхний угол) */
 .metrics-widget {
   position: fixed;
-  top: 60px;
+  top: 96px; /* ниже второй панели */
   right: 20px;
+  bottom: 120px; /* не перекрывает горячие клавиши */
   z-index: 500;
   background: white;
   border: 1px solid #E5F0E8;
@@ -663,6 +705,28 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
 .metrics-widget-label {
   font-size: 11px;
   color: #5B7465;
+}
+
+/* Звёзды оценки */
+.rating-stars {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.star {
+  font-size: 24px;
+  cursor: pointer;
+  color: #E5F0E8;
+  transition: color 0.2s;
+}
+
+.star.filled {
+  color: #F4B860;
+}
+
+.star:hover {
+  color: #F4B860;
 }
 
 /* Адаптивность */
