@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import Link from 'next/link'               // <-- добавлен импорт
+import Link from 'next/link'               // ← обязательно
 import { supabase } from '../lib/supabaseClient'
 
 const STATUS_COLUMNS = [
