@@ -274,6 +274,43 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link {
   box-shadow: 0 0 0 3px rgba(76,175,106,0.1);
 }
 
+/* ========== АНИМАЦИЯ ЗАГРУЗКИ (ЛИСТОЧЕК) ========== */
+.loading-leaf-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #E8F4FD;
+}
+
+.loading-leaf {
+  width: 90px;
+  height: 90px;
+  background: radial-gradient(circle at 30% 30%, #7AC78F 0%, #4CAF6A 50%, #A3E0B0 100%);
+  clip-path: path('M50,10 C30,20 20,50 50,70 C80,50 70,20 50,10 Z');
+  animation:
+    leaf-pulse 3s ease-in-out infinite alternate,
+    leaf-swing 4s ease-in-out infinite;
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+  transform-origin: center bottom;
+}
+
+@keyframes leaf-pulse {
+  0% {
+    background: radial-gradient(circle at 30% 30%, #7AC78F 0%, #4CAF6A 50%, #A3E0B0 100%);
+  }
+  100% {
+    background: radial-gradient(circle at 30% 30%, #A3E0B0 0%, #7AC78F 50%, #4CAF6A 100%);
+  }
+}
+
+@keyframes leaf-swing {
+  0% { transform: rotate(-10deg); }
+  50% { transform: rotate(0deg); }
+  100% { transform: rotate(10deg); }
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
   .crm-wrapper {
