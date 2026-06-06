@@ -76,26 +76,52 @@ export default function CRM() {
   }, [router.isReady, router.query])
 
   const loadAll = async (userId) => {
-    const [{ data: profileData }, { data: balanceData }, { data: taskAssignments }, { data: goalsData }, { data: employeesData }] = await Promise.all([
-      supabase.from('profiles').select('first_name, last_name, avatar_url, position_id, positions(title)').eq('user_id', userId).single(),
-      supabase.from('karma_balance').select('balance').eq('user_id', userId).single(),
-      supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', userId).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
-      supabase.from('goals').select('*').eq('user_id', userId).eq('is_active', true).order('period'),
-      supabase.from('profiles').select('user_id, display_name, email').eq('company_id', profileData?.company_id).not('role_id', 'in', '(1,2)').is('deleted_at', null)
-    ])
-    if (profileData) setProfile(profileData)
-    if (balanceData) setBalance(balanceData.balance)
-    if (taskAssignments) setTasks(taskAssignments)
-    if (goalsData) setGoals(goalsData)
-    if (employeesData) setEmployees(employeesData)
-    const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
-    if (savedCalls) setCalls(parseInt(savedCalls))
-    setLoading(false)
+    try {
+      // 1. Сначала загружаем профиль
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, avatar_url, position_id, positions(title)')
+        .eq('user_id', userId)
+        .single()
 
-    const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
-    return () => clearTimeout(timeout)
+      if (!profileData) {
+        setNeedsLogin(true)
+        setLoading(false)
+        return
+      }
+      setProfile(profileData)
+
+      // 2. Параллельно загружаем всё остальное, используя company_id из профиля
+      const companyId = profileData.company_id
+      const [{ data: balanceData }, { data: taskAssignments }, { data: goalsData }, { data: employeesData }] = await Promise.all([
+        supabase.from('karma_balance').select('balance').eq('user_id', userId).single(),
+        supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', userId).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
+        supabase.from('goals').select('*').eq('user_id', userId).eq('is_active', true).order('period'),
+        supabase.from('profiles').select('user_id, display_name, email').eq('company_id', companyId).not('role_id', 'in', '(1,2)').is('deleted_at', null)
+      ])
+
+      if (balanceData) setBalance(balanceData.balance)
+      if (taskAssignments) setTasks(taskAssignments)
+      if (goalsData) setGoals(goalsData)
+      if (employeesData) setEmployees(employeesData)
+
+      const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
+      if (savedCalls) setCalls(parseInt(savedCalls))
+
+      setLoading(false)
+
+      // Запускаем таймер облаков
+      const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
+      return () => clearTimeout(timeout)
+    } catch (error) {
+      console.error('Ошибка загрузки данных:', error)
+      setLoading(false)
+    }
   }
 
+  // ... (useEffect для облаков, addProgress, addCall, validateDealForm, handleCreateDeal — всё остаётся без изменений, как в предыдущем полном файле)
+
+  // Ниже полный код с уже вставленными функциями
   useEffect(() => {
     if (!windActive) return
     const timer = setTimeout(() => setWindActive(false), 20000)
