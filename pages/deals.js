@@ -26,13 +26,35 @@ const PRIORITY_COLORS = {
   urgent: '#EF4444'
 }
 
+function ActionButton({ children, onClick, primary = false, style = {} }) {
+  return (
+    <button
+      onClick={onClick}
+      className={primary ? 'action-btn primary' : 'action-btn'}
+      style={{
+        padding: '10px 24px',
+        borderRadius: '12px',
+        border: 'none',
+        backgroundColor: primary ? '#4CAF6A' : '#F2F9F4',
+        color: primary ? 'white' : '#5B7465',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: 500,
+        transition: 'all 0.2s',
+        ...style
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 export default function DealsPage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [balance, setBalance] = useState(0)
   const [tasks, setTasks] = useState([])
-  const [calls, setCalls] = useState(0)
   const [goals, setGoals] = useState([])
   const [deals, setDeals] = useState([])
   const [loading, setLoading] = useState(true)
@@ -57,19 +79,16 @@ export default function DealsPage() {
       if (!currentUser) { setNeedsLogin(true); setLoading(false); return }
       setUser(currentUser)
 
-      // Загружаем профиль (получаем company_id)
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('first_name, last_name, avatar_url, position_id, company_id, positions(title)')
+        .select('first_name, last_name, company_id, position_id, positions(title)')
         .eq('user_id', currentUser.id)
         .single()
 
       if (!profileData?.company_id) { setNeedsLogin(true); setLoading(false); return }
       setProfile(profileData)
-
       const companyId = profileData.company_id
 
-      // Загружаем всё остальное
       const [{ data: balanceData }, { data: taskAssignments }, { data: goalsData }, { data: dealsData }] = await Promise.all([
         supabase.from('karma_balance').select('balance').eq('user_id', currentUser.id).single(),
         supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', currentUser.id).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
@@ -81,9 +100,6 @@ export default function DealsPage() {
       if (taskAssignments) setTasks(taskAssignments)
       if (goalsData) setGoals(goalsData)
       if (dealsData) setDeals(dealsData)
-
-      const savedCalls = localStorage.getItem(`crm_calls_${currentUser.id}`)
-      if (savedCalls) setCalls(parseInt(savedCalls))
 
       setLoading(false)
     }
@@ -115,7 +131,6 @@ export default function DealsPage() {
     }
     setShowCreateModal(false)
     setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
-    // Обновляем список сделок
     const { data: freshDeals } = await supabase
       .from('deals')
       .select('*, responsible:responsible_user_id ( email, display_name )')
@@ -145,9 +160,7 @@ export default function DealsPage() {
     return { color: '#7AC78F', text: `${days} д.` }
   }
 
-  if (loading) {
-    return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
-  }
+  if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
 
   if (needsLogin) {
     return (
@@ -198,7 +211,7 @@ export default function DealsPage() {
           <div className="dash-mini">
             <div className="dash-row"><span>Заданий CRM</span><span>{tasks.length}</span></div>
             <div className="dash-row"><span>Можно заработать</span><span style={{color:'#4CAF6A'}}>+{tasks.reduce((sum, a) => sum + (a.tasks?.reward_karma || 0), 0)}</span></div>
-            <div className="dash-row"><span>Звонков сегодня</span><span>{calls}</span></div>
+            <div className="dash-row"><span>Звонков сегодня</span><span>0</span></div>
           </div>
           {goals.length > 0 && (
             <div className="dash-mini">
@@ -212,19 +225,41 @@ export default function DealsPage() {
           )}
         </div>
 
-        <div className="main-content" style={{ flexDirection: 'column', overflow: 'auto' }}>
+        <div className="main-content">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <h2 style={{ fontSize: 24, fontWeight: 600, color: '#1F2E23' }}>Динамическая лента сделок</h2>
-            <button onClick={() => setShowCreateModal(true)} className="action-btn primary" style={{ padding: '10px 24px' }}>Новая сделка</button>
+            <ActionButton primary onClick={() => setShowCreateModal(true)}>
+              Новая сделка
+            </ActionButton>
           </div>
 
           {/* Канбан-доска */}
-          <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16, flex: 1 }}>
+          <div style={{
+            display: 'flex',
+            gap: 16,
+            overflowX: 'auto',
+            paddingBottom: 16,
+            paddingTop: 16
+          }}>
             {STATUS_COLUMNS.map(col => {
               const columnDeals = deals.filter(d => d.status === col.key)
               return (
-                <div key={col.key} style={{ minWidth: 260, maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#2D6A4F', padding: '0 4px' }}>{col.label} ({columnDeals.length})</h3>
+                <div key={col.key} style={{
+                  minWidth: '260px',
+                  maxWidth: '300px',
+                  flex: '0 0 auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12
+                }}>
+                  <h3 style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: '#2D6A4F',
+                    padding: '0 4px'
+                  }}>
+                    {col.label} ({columnDeals.length})
+                  </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {columnDeals.map(deal => {
                       const deadlineInfo = deadlineIndicator(deal.deadline)
@@ -263,7 +298,7 @@ export default function DealsPage() {
           {/* Модальное окно создания сделки */}
           {showCreateModal && (
             <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-              <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 20, padding: 28, maxWidth: 480, width: '90%', boxShadow: '0 8px 30px rgba(0,0,0,0.1)' }}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
                 <h3 style={{ fontSize: 20, fontWeight: 600, color: '#1F2E23', marginBottom: 20 }}>Новая сделка</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <input className="input-field" placeholder="Название сделки" value={newDeal.title} onChange={e => setNewDeal({...newDeal, title: e.target.value})} />
@@ -280,8 +315,8 @@ export default function DealsPage() {
                     <input className="input-field" type="date" value={newDeal.deadline} onChange={e => setNewDeal({...newDeal, deadline: e.target.value})} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>
-                    <button onClick={() => setShowCreateModal(false)} className="action-btn" style={{ background: '#F2F9F4', color: '#5B7465' }}>Отмена</button>
-                    <button onClick={handleCreateDeal} className="action-btn primary" style={{ padding: '10px 24px' }}>Создать</button>
+                    <ActionButton onClick={() => setShowCreateModal(false)}>Отмена</ActionButton>
+                    <ActionButton primary onClick={handleCreateDeal}>Создать</ActionButton>
                   </div>
                 </div>
               </div>
@@ -291,7 +326,7 @@ export default function DealsPage() {
           {/* Фокус-режим (карточка сделки) */}
           {focusDeal && (
             <div className="modal-overlay" onClick={() => setFocusDeal(null)}>
-              <div className="modal-content" onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 20, padding: 28, maxWidth: 600, width: '90%', boxShadow: '0 8px 30px rgba(0,0,0,0.1)' }}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
                 <h3 style={{ fontSize: 22, fontWeight: 600, color: '#1F2E23', marginBottom: 16 }}>{focusDeal.title}</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 14, color: '#5B7465' }}>
                   <div>Клиент: {focusDeal.client_name || '—'}</div>
@@ -303,23 +338,23 @@ export default function DealsPage() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
                   {focusDeal.status === 'new' && (
-                    <button onClick={() => updateDealStatus(focusDeal.id, 'qualification')} className="action-btn" style={{ background: '#E5F0E8', color: '#2D6A4F' }}>На квалификацию</button>
+                    <ActionButton primary onClick={() => updateDealStatus(focusDeal.id, 'qualification')}>На квалификацию</ActionButton>
                   )}
                   {focusDeal.status === 'qualification' && (
-                    <button onClick={() => updateDealStatus(focusDeal.id, 'proposal')} className="action-btn" style={{ background: '#E5F0E8', color: '#2D6A4F' }}>Предложить</button>
+                    <ActionButton primary onClick={() => updateDealStatus(focusDeal.id, 'proposal')}>Предложить</ActionButton>
                   )}
                   {focusDeal.status === 'proposal' && (
-                    <button onClick={() => updateDealStatus(focusDeal.id, 'negotiation')} className="action-btn" style={{ background: '#E5F0E8', color: '#2D6A4F' }}>В переговоры</button>
+                    <ActionButton primary onClick={() => updateDealStatus(focusDeal.id, 'negotiation')}>В переговоры</ActionButton>
                   )}
                   {focusDeal.status === 'negotiation' && (
                     <>
-                      <button onClick={() => updateDealStatus(focusDeal.id, 'won')} className="action-btn primary">Успешно закрыто</button>
-                      <button onClick={() => updateDealStatus(focusDeal.id, 'lost')} className="action-btn" style={{ background: '#FEE2E2', color: '#B91C1C' }}>Закрыть с проигрышем</button>
+                      <ActionButton primary onClick={() => updateDealStatus(focusDeal.id, 'won')}>Успешно закрыто</ActionButton>
+                      <ActionButton onClick={() => updateDealStatus(focusDeal.id, 'lost')} style={{ backgroundColor: '#FEE2E2', color: '#B91C1C' }}>Закрыть с проигрышем</ActionButton>
                     </>
                   )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
-                  <button onClick={() => setFocusDeal(null)} className="action-btn" style={{ background: '#F2F9F4', color: '#5B7465' }}>Закрыть</button>
+                  <ActionButton onClick={() => setFocusDeal(null)}>Закрыть</ActionButton>
                 </div>
               </div>
             </div>
