@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import Link from 'next/link'               // ← этот импорт решает проблему
+import Link from 'next/link'
 import { supabase } from '../lib/supabaseClient'
 
 const STATUS_COLUMNS = [
@@ -77,36 +77,49 @@ export default function DealsPage() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-      if (!currentUser) { setNeedsLogin(true); setLoading(false); return }
-      setUser(currentUser)
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        if (!currentUser) {
+          setNeedsLogin(true)
+          setLoading(false)
+          return
+        }
+        setUser(currentUser)
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, company_id, position_id, positions(title)')
-        .eq('user_id', currentUser.id)
-        .single()
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, company_id, position_id, positions(title)')
+          .eq('user_id', currentUser.id)
+          .single()
 
-      if (!profileData?.company_id) { setNeedsLogin(true); setLoading(false); return }
-      setProfile(profileData)
-      const companyId = profileData.company_id
+        if (!profileData?.company_id) {
+          setNeedsLogin(true)
+          setLoading(false)
+          return
+        }
+        setProfile(profileData)
+        const companyId = profileData.company_id
 
-      const [{ data: balanceData }, { data: taskAssignments }, { data: goalsData }, { data: dealsData }] = await Promise.all([
-        supabase.from('karma_balance').select('balance').eq('user_id', currentUser.id).single(),
-        supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', currentUser.id).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
-        supabase.from('goals').select('*').eq('user_id', currentUser.id).eq('is_active', true).order('period'),
-        supabase.from('deals').select('*, responsible:responsible_user_id ( email, display_name )').eq('company_id', companyId).order('created_at', { ascending: false })
-      ])
+        const [{ data: balanceData }, { data: taskAssignments }, { data: goalsData }, { data: dealsData }] = await Promise.all([
+          supabase.from('karma_balance').select('balance').eq('user_id', currentUser.id).single(),
+          supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', currentUser.id).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
+          supabase.from('goals').select('*').eq('user_id', currentUser.id).eq('is_active', true).order('period'),
+          supabase.from('deals').select('*, responsible:responsible_user_id ( email, display_name )').eq('company_id', companyId).order('created_at', { ascending: false })
+        ])
 
-      if (balanceData) setBalance(balanceData.balance)
-      if (taskAssignments) setTasks(taskAssignments)
-      if (goalsData) setGoals(goalsData)
-      if (dealsData) setDeals(dealsData)
+        if (balanceData) setBalance(balanceData.balance)
+        if (taskAssignments) setTasks(taskAssignments)
+        if (goalsData) setGoals(goalsData)
+        if (dealsData) setDeals(dealsData)
 
-      setLoading(false)
+        setLoading(false)
 
-      const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
-      return () => clearTimeout(timeout)
+        const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
+        return () => clearTimeout(timeout)
+      } catch (error) {
+        console.error('Ошибка загрузки данных сделок:', error)
+        setLoading(false)
+      }
     }
     init()
   }, [])
@@ -128,44 +141,63 @@ export default function DealsPage() {
     setTimeout(() => setNotification({ show: false, message: '' }), 3000)
   }
 
+  // Оптимизированное создание сделки (обновляем локальное состояние без лишнего запроса)
   const handleCreateDeal = async () => {
     if (!newDeal.title.trim()) return
-    const { error } = await supabase.from('deals').insert({
-      company_id: profile.company_id,
-      title: newDeal.title,
-      description: newDeal.description,
-      client_name: newDeal.client_name,
-      amount: parseFloat(newDeal.amount) || null,
-      priority: newDeal.priority,
-      deadline: newDeal.deadline || null,
-      responsible_user_id: newDeal.responsible_user_id || null,
-      status: 'new',
-      progress: 0
-    })
+    const { data, error } = await supabase
+      .from('deals')
+      .insert({
+        company_id: profile.company_id,
+        title: newDeal.title,
+        description: newDeal.description,
+        client_name: newDeal.client_name,
+        amount: parseFloat(newDeal.amount) || null,
+        priority: newDeal.priority,
+        deadline: newDeal.deadline || null,
+        responsible_user_id: newDeal.responsible_user_id || null,
+        status: 'new',
+        progress: 0
+      })
+      .select('*, responsible:responsible_user_id ( email, display_name )')
+      .single()
+
     if (error) {
       showNotification('Ошибка создания сделки')
       return
     }
+
+    // Добавляем новую сделку в начало списка
+    setDeals(prev => [data, ...prev])
     setShowCreateModal(false)
-    setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
-    const { data: freshDeals } = await supabase
-      .from('deals')
-      .select('*, responsible:responsible_user_id ( email, display_name )')
-      .eq('company_id', profile.company_id)
-      .order('created_at', { ascending: false })
-    if (freshDeals) setDeals(freshDeals)
+    setNewDeal({
+      title: '',
+      description: '',
+      client_name: '',
+      amount: '',
+      priority: 'medium',
+      deadline: '',
+      responsible_user_id: ''
+    })
     showNotification('Сделка создана')
   }
 
+  // Оптимизированное обновление статуса сделки (меняем только локальное состояние)
   const updateDealStatus = async (dealId, newStatus) => {
-    await supabase.from('deals').update({ status: newStatus, updated_at: new Date() }).eq('id', dealId)
-    const { data: freshDeals } = await supabase
+    const { error } = await supabase
       .from('deals')
-      .select('*, responsible:responsible_user_id ( email, display_name )')
-      .eq('company_id', profile.company_id)
-      .order('created_at', { ascending: false })
-    if (freshDeals) setDeals(freshDeals)
-    setFocusDeal(null)
+      .update({ status: newStatus, updated_at: new Date() })
+      .eq('id', dealId)
+
+    if (!error) {
+      setDeals(prev =>
+        prev.map(deal =>
+          deal.id === dealId ? { ...deal, status: newStatus } : deal
+        )
+      )
+      setFocusDeal(null)
+    } else {
+      showNotification('Ошибка обновления статуса')
+    }
   }
 
   const deadlineIndicator = (deadline) => {
