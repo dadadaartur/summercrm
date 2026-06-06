@@ -64,6 +64,8 @@ export default function DealsPage() {
   const [focusDeal, setFocusDeal] = useState(null)
   const [notification, setNotification] = useState({ show: false, message: '' })
   const [windActive, setWindActive] = useState(false)
+  const [employees, setEmployees] = useState([])
+  const [formErrors, setFormErrors] = useState({})
 
   const [newDeal, setNewDeal] = useState({
     title: '',
@@ -92,17 +94,19 @@ export default function DealsPage() {
         setProfile(profileData)
         const companyId = profileData.company_id
 
-        const [{ data: balanceData }, { data: taskAssignments }, { data: goalsData }, { data: dealsData }] = await Promise.all([
+        const [{ data: balanceData }, { data: taskAssignments }, { data: goalsData }, { data: dealsData }, { data: employeesData }] = await Promise.all([
           supabase.from('karma_balance').select('balance').eq('user_id', currentUser.id).single(),
           supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', currentUser.id).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
           supabase.from('goals').select('*').eq('user_id', currentUser.id).eq('is_active', true).order('period'),
-          supabase.from('deals').select('*, responsible:responsible_user_id ( email, display_name )').eq('company_id', companyId).order('created_at', { ascending: false })
+          supabase.from('deals').select('*, responsible:responsible_user_id ( email, display_name )').eq('company_id', companyId).order('created_at', { ascending: false }),
+          supabase.from('profiles').select('user_id, display_name, email').eq('company_id', companyId).not('role_id', 'in', '(1,2)').is('deleted_at', null)
         ])
 
         if (balanceData) setBalance(balanceData.balance)
         if (taskAssignments) setTasks(taskAssignments)
         if (goalsData) setGoals(goalsData)
         if (dealsData) setDeals(dealsData)
+        if (employeesData) setEmployees(employeesData)
 
         setLoading(false)
 
@@ -133,15 +137,24 @@ export default function DealsPage() {
     setTimeout(() => setNotification({ show: false, message: '' }), 3000)
   }
 
+  const validateDealForm = () => {
+    const errors = {}
+    if (!newDeal.title.trim()) errors.title = 'Обязательное поле'
+    if (!newDeal.client_name.trim()) errors.client_name = 'Обязательное поле'
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleCreateDeal = async () => {
-    if (!newDeal.title.trim()) return
+    if (!validateDealForm()) return
+
     const { data, error } = await supabase
       .from('deals')
       .insert({
         company_id: profile.company_id,
-        title: newDeal.title,
-        description: newDeal.description,
-        client_name: newDeal.client_name,
+        title: newDeal.title.trim(),
+        description: newDeal.description.trim(),
+        client_name: newDeal.client_name.trim(),
         amount: parseFloat(newDeal.amount) || null,
         priority: newDeal.priority,
         deadline: newDeal.deadline || null,
@@ -160,6 +173,7 @@ export default function DealsPage() {
     setDeals(prev => [data, ...prev])
     setShowCreateModal(false)
     setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
+    setFormErrors({})
     showNotification('Сделка создана')
   }
 
@@ -317,26 +331,120 @@ export default function DealsPage() {
 
           {showCreateModal && (
             <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-              <div className="modal-content" onClick={e => e.stopPropagation()}>
-                <h3 style={{ fontSize: 20, fontWeight: 600, color: '#1F2E23', marginBottom: 20 }}>Новая сделка</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <input className="input-field" placeholder="Название сделки" value={newDeal.title} onChange={e => setNewDeal({...newDeal, title: e.target.value})} />
-                  <textarea className="input-field" rows={2} placeholder="Описание" value={newDeal.description} onChange={e => setNewDeal({...newDeal, description: e.target.value})} />
-                  <input className="input-field" placeholder="Клиент" value={newDeal.client_name} onChange={e => setNewDeal({...newDeal, client_name: e.target.value})} />
-                  <input className="input-field" type="number" placeholder="Сумма" value={newDeal.amount} onChange={e => setNewDeal({...newDeal, amount: e.target.value})} />
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <select className="input-field" value={newDeal.priority} onChange={e => setNewDeal({...newDeal, priority: e.target.value})}>
-                      <option value="low">Низкий</option>
-                      <option value="medium">Средний</option>
-                      <option value="high">Высокий</option>
-                      <option value="urgent">Критичный</option>
+              <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', padding: '32px' }}>
+                <h3 style={{ fontSize: 22, fontWeight: 600, color: '#1F2E23', marginBottom: 24, borderBottom: '1px solid #E5F0E8', paddingBottom: 12 }}>
+                  Новая сделка
+                </h3>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px' }}>
+                  {/* Название */}
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>
+                      Название сделки <span style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <input
+                      className={`input-field ${formErrors.title ? 'border-red-400' : ''}`}
+                      placeholder="Краткое описание сути"
+                      value={newDeal.title}
+                      onChange={e => { setNewDeal({...newDeal, title: e.target.value}); if (formErrors.title) setFormErrors({...formErrors, title: null}) }}
+                    />
+                    {formErrors.title && <div style={{ color: '#EF4444', fontSize: 12, marginTop: 2 }}>{formErrors.title}</div>}
+                  </div>
+
+                  {/* Клиент */}
+                  <div>
+                    <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>
+                      Клиент <span style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <input
+                      className={`input-field ${formErrors.client_name ? 'border-red-400' : ''}`}
+                      placeholder="Компания или ФИО"
+                      value={newDeal.client_name}
+                      onChange={e => { setNewDeal({...newDeal, client_name: e.target.value}); if (formErrors.client_name) setFormErrors({...formErrors, client_name: null}) }}
+                    />
+                    {formErrors.client_name && <div style={{ color: '#EF4444', fontSize: 12, marginTop: 2 }}>{formErrors.client_name}</div>}
+                  </div>
+
+                  {/* Сумма */}
+                  <div>
+                    <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Сумма сделки (₽)</label>
+                    <input
+                      className="input-field"
+                      type="number"
+                      placeholder="0"
+                      value={newDeal.amount}
+                      onChange={e => setNewDeal({...newDeal, amount: e.target.value})}
+                    />
+                  </div>
+
+                  {/* Приоритет */}
+                  <div>
+                    <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Приоритет</label>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', height: 42 }}>
+                      {['low', 'medium', 'high', 'urgent'].map(level => (
+                        <label key={level} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="priority"
+                            value={level}
+                            checked={newDeal.priority === level}
+                            onChange={e => setNewDeal({...newDeal, priority: e.target.value})}
+                            style={{ accentColor: '#4CAF6A' }}
+                          />
+                          <span style={{
+                            width: 12, height: 12, borderRadius: 4,
+                            backgroundColor: level === 'low' ? '#7AC78F' : level === 'medium' ? '#F4B860' : level === 'high' ? '#F28B82' : '#EF4444'
+                          }} />
+                          <span style={{ fontSize: 13, color: '#1F2E23' }}>
+                            {level === 'low' ? 'Низкий' : level === 'medium' ? 'Средний' : level === 'high' ? 'Высокий' : 'Критичный'}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Дедлайн */}
+                  <div>
+                    <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Дедлайн</label>
+                    <input
+                      className="input-field"
+                      type="date"
+                      value={newDeal.deadline}
+                      onChange={e => setNewDeal({...newDeal, deadline: e.target.value})}
+                    />
+                  </div>
+
+                  {/* Ответственный */}
+                  <div>
+                    <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Ответственный</label>
+                    <select
+                      className="input-field"
+                      value={newDeal.responsible_user_id}
+                      onChange={e => setNewDeal({...newDeal, responsible_user_id: e.target.value})}
+                    >
+                      <option value="">Не назначен</option>
+                      {employees.map(emp => (
+                        <option key={emp.user_id} value={emp.user_id}>{emp.display_name || emp.email}</option>
+                      ))}
                     </select>
-                    <input className="input-field" type="date" value={newDeal.deadline} onChange={e => setNewDeal({...newDeal, deadline: e.target.value})} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>
-                    <ActionButton onClick={() => setShowCreateModal(false)}>Отмена</ActionButton>
-                    <ActionButton primary onClick={handleCreateDeal}>Создать</ActionButton>
+
+                  {/* Описание */}
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Описание</label>
+                    <textarea
+                      className="input-field"
+                      rows={4}
+                      placeholder="Детали, особые условия, примечания"
+                      value={newDeal.description}
+                      onChange={e => setNewDeal({...newDeal, description: e.target.value})}
+                    />
                   </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+                  <ActionButton onClick={() => { setShowCreateModal(false); setFormErrors({}) }}>Отмена</ActionButton>
+                  <ActionButton primary onClick={handleCreateDeal}>Создать</ActionButton>
                 </div>
               </div>
             </div>
