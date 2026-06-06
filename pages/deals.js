@@ -62,6 +62,7 @@ export default function DealsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [focusDeal, setFocusDeal] = useState(null)
   const [notification, setNotification] = useState({ show: false, message: '' })
+  const [windActive, setWindActive] = useState(false)
 
   const [newDeal, setNewDeal] = useState({
     title: '',
@@ -102,9 +103,25 @@ export default function DealsPage() {
       if (dealsData) setDeals(dealsData)
 
       setLoading(false)
+
+      // Первый пролёт облаков через 10 минут
+      const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
+      return () => clearTimeout(timeout)
     }
     init()
   }, [])
+
+  useEffect(() => {
+    if (!windActive) return
+    const timer = setTimeout(() => setWindActive(false), 20000)
+    return () => clearTimeout(timer)
+  }, [windActive])
+
+  useEffect(() => {
+    if (windActive) return
+    const interval = setInterval(() => setWindActive(true), 10 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [windActive])
 
   const showNotification = (msg) => {
     setNotification({ show: true, message: msg })
@@ -187,7 +204,9 @@ export default function DealsPage() {
       </Head>
 
       <div className="crm-topbar">
-        <div className="topbar-logo">CRM Лето</div>
+        <a href="/" className="topbar-logo-link">
+          <span className="back-arrow">←</span> CRM Лето
+        </a>
         <div className="topbar-right">
           <a className="planet-link" href="/planet">Моя любимая планета Земля</a>
           <a href="/" className="topbar-name" style={{ textDecoration: 'none' }}>{displayName}</a>
@@ -195,10 +214,18 @@ export default function DealsPage() {
       </div>
 
       <div className="crm-wrapper">
-        <div className="cloud-bg">
+        <div className={`cloud-bg ${windActive ? 'active' : ''}`}>
           <div className="cloud cloud1"></div>
           <div className="cloud cloud2"></div>
           <div className="cloud cloud3"></div>
+        </div>
+        <div className={`leaf-container ${windActive ? 'active' : ''}`} />
+
+        <div className="wind-btn" onClick={() => setWindActive(true)} title="Вызвать лёгкий ветер">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2C12 2 6 7 6 12C6 17 12 20 12 20C12 20 18 17 18 12C18 7 12 2 12 2Z" strokeLinecap="round"/>
+            <line x1="12" y1="20" x2="12" y2="22" strokeLinecap="round"/>
+          </svg>
         </div>
 
         <div className="sidebar">
@@ -227,7 +254,7 @@ export default function DealsPage() {
 
         <div className="main-content">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <h2 style={{ fontSize: 24, fontWeight: 600, color: '#1F2E23' }}>Динамическая лента сделок</h2>
+            <h2 style={{ fontSize: 24, fontWeight: 600, color: '#1F2E23' }}>Сделки</h2>
             <ActionButton primary onClick={() => setShowCreateModal(true)}>
               Новая сделка
             </ActionButton>
