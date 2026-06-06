@@ -141,7 +141,6 @@ export default function DealsPage() {
     setTimeout(() => setNotification({ show: false, message: '' }), 3000)
   }
 
-  // Оптимизированное создание сделки (обновляем локальное состояние без лишнего запроса)
   const handleCreateDeal = async () => {
     if (!newDeal.title.trim()) return
     const { data, error } = await supabase
@@ -166,7 +165,6 @@ export default function DealsPage() {
       return
     }
 
-    // Добавляем новую сделку в начало списка
     setDeals(prev => [data, ...prev])
     setShowCreateModal(false)
     setNewDeal({
@@ -181,7 +179,6 @@ export default function DealsPage() {
     showNotification('Сделка создана')
   }
 
-  // Оптимизированное обновление статуса сделки (меняем только локальное состояние)
   const updateDealStatus = async (dealId, newStatus) => {
     const { error } = await supabase
       .from('deals')
