@@ -1,7 +1,31 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import Link from 'next/link'
 import { supabase } from '../lib/supabaseClient'
+
+function ActionButton({ children, onClick, primary = false, style = {} }) {
+  return (
+    <button
+      onClick={onClick}
+      className={primary ? 'action-btn primary' : 'action-btn'}
+      style={{
+        padding: '10px 24px',
+        borderRadius: '12px',
+        border: 'none',
+        backgroundColor: primary ? '#4CAF6A' : '#F2F9F4',
+        color: primary ? 'white' : '#5B7465',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: 500,
+        transition: 'all 0.2s',
+        ...style
+      }}
+    >
+      {children}
+    </button>
+  )
+}
 
 export default function CRM() {
   const router = useRouter()
@@ -13,6 +37,19 @@ export default function CRM() {
   const [loading, setLoading] = useState(true)
   const [needsLogin, setNeedsLogin] = useState(false)
   const [goals, setGoals] = useState([])
+
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newDeal, setNewDeal] = useState({
+    title: '',
+    description: '',
+    client_name: '',
+    amount: '',
+    priority: 'medium',
+    deadline: '',
+    responsible_user_id: ''
+  })
+
+  const [windActive, setWindActive] = useState(false)
 
   useEffect(() => {
     if (!router.isReady) return
@@ -49,7 +86,22 @@ export default function CRM() {
     const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
     if (savedCalls) setCalls(parseInt(savedCalls))
     setLoading(false)
+
+    const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
+    return () => clearTimeout(timeout)
   }
+
+  useEffect(() => {
+    if (!windActive) return
+    const timer = setTimeout(() => setWindActive(false), 20000)
+    return () => clearTimeout(timer)
+  }, [windActive])
+
+  useEffect(() => {
+    if (windActive) return
+    const interval = setInterval(() => setWindActive(true), 10 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [windActive])
 
   const addProgress = async (goalId, currentVal) => {
     const newVal = currentVal + 1
@@ -94,7 +146,36 @@ export default function CRM() {
     if (updatedAssignments) setTasks(updatedAssignments)
   }
 
-  if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
+  const handleCreateDeal = async () => {
+    if (!newDeal.title.trim()) return
+    const { error } = await supabase.from('deals').insert({
+      company_id: profile.company_id,
+      title: newDeal.title,
+      description: newDeal.description,
+      client_name: newDeal.client_name,
+      amount: parseFloat(newDeal.amount) || null,
+      priority: newDeal.priority,
+      deadline: newDeal.deadline || null,
+      responsible_user_id: newDeal.responsible_user_id || null,
+      status: 'new',
+      progress: 0
+    })
+    if (error) {
+      alert('Ошибка создания сделки')
+      return
+    }
+    setShowCreateModal(false)
+    setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
+    alert('Сделка создана')
+  }
+
+  if (loading) {
+    return (
+      <div className="loading-leaf-container">
+        <div className="loading-leaf"></div>
+      </div>
+    )
+  }
 
   if (needsLogin) {
     return (
@@ -102,8 +183,7 @@ export default function CRM() {
         <div style={{ textAlign: 'center', background: 'white', padding: '48px', borderRadius: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <h2 style={{ marginBottom: '16px', fontWeight: 600, color: '#2D6A4F' }}>Добро пожаловать в CRM Лето</h2>
           <p style={{ marginBottom: '24px', color: '#5B7465' }}>Для работы с CRM необходимо авторизоваться в Кармическом банке</p>
-          <a href="https://arthurcrm.vercel.app/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке"
-             style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}>
+          <a href="https://arthurcrm.vercel.app/login" style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}>
             Войти в Кармический банк
           </a>
         </div>
@@ -118,27 +198,34 @@ export default function CRM() {
   return (
     <>
       <div className="crm-topbar">
-        <div className="topbar-logo">CRM Лето</div>
+        <Link href="/" className="topbar-logo-link">
+          <span className="back-arrow">←</span> CRM Лето
+        </Link>
         <div className="topbar-right">
-          <a className="planet-link" href="/planet">Моя любимая планета Земля</a>
-          <a className="topbar-name" href="https://arthurcrm.vercel.app/profile" target="_blank" rel="noopener noreferrer">{displayName}</a>
+          <span className="topbar-name">{displayName}</span>
         </div>
+      </div>
+
+      <div className="nav-panel">
+        <Link href="/deals" className="nav-link">Сделки</Link>
+        <Link href="/chat" className="nav-link">Чат</Link>
+        <span className="nav-link">Звонки</span>
       </div>
 
       <div className="crm-wrapper">
         <Head>
           <title>CRM Лето</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         </Head>
 
-        <div className="cloud-bg">
+        <div className={`cloud-bg ${windActive ? 'active' : ''}`}>
           <div className="cloud cloud1"></div>
           <div className="cloud cloud2"></div>
           <div className="cloud cloud3"></div>
         </div>
-        <div className="leaf-container" id="leafContainer" />
-        <div className="wind-btn" id="windButton" title="Вызвать лёгкий ветер">
+        <div className={`leaf-container ${windActive ? 'active' : ''}`} />
+
+        <div className="wind-btn" onClick={() => setWindActive(true)} title="Вызвать лёгкий ветер">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 2C12 2 6 7 6 12C6 17 12 20 12 20C12 20 18 17 18 12C18 7 12 2 12 2Z" strokeLinecap="round"/>
             <line x1="12" y1="20" x2="12" y2="22" strokeLinecap="round"/>
@@ -175,7 +262,7 @@ export default function CRM() {
         <div className="main-content">
           <div className="left-col">
             <div className="actions">
-              <button className="action-btn primary">Новая сделка</button>
+              <button className="action-btn primary" onClick={() => setShowCreateModal(true)}>Новая сделка</button>
               <button className="action-btn" onClick={addCall}>Звонок</button>
               <button className="action-btn">Письмо</button>
               <button className="action-btn">Встреча</button>
@@ -230,6 +317,33 @@ export default function CRM() {
           </div>
         </div>
       </div>
+
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 20, fontWeight: 600, color: '#1F2E23', marginBottom: 20 }}>Новая сделка</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input className="input-field" placeholder="Название сделки" value={newDeal.title} onChange={e => setNewDeal({...newDeal, title: e.target.value})} />
+              <textarea className="input-field" rows={2} placeholder="Описание" value={newDeal.description} onChange={e => setNewDeal({...newDeal, description: e.target.value})} />
+              <input className="input-field" placeholder="Клиент" value={newDeal.client_name} onChange={e => setNewDeal({...newDeal, client_name: e.target.value})} />
+              <input className="input-field" type="number" placeholder="Сумма" value={newDeal.amount} onChange={e => setNewDeal({...newDeal, amount: e.target.value})} />
+              <div style={{ display: 'flex', gap: 12 }}>
+                <select className="input-field" value={newDeal.priority} onChange={e => setNewDeal({...newDeal, priority: e.target.value})}>
+                  <option value="low">Низкий</option>
+                  <option value="medium">Средний</option>
+                  <option value="high">Высокий</option>
+                  <option value="urgent">Критичный</option>
+                </select>
+                <input className="input-field" type="date" value={newDeal.deadline} onChange={e => setNewDeal({...newDeal, deadline: e.target.value})} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>
+                <ActionButton onClick={() => setShowCreateModal(false)}>Отмена</ActionButton>
+                <ActionButton primary onClick={handleCreateDeal}>Создать</ActionButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
