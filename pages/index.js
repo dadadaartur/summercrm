@@ -37,7 +37,6 @@ export default function CRM() {
   const [needsLogin, setNeedsLogin] = useState(false)
   const [goals, setGoals] = useState([])
 
-  // Состояния для модального окна создания сделки
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newDeal, setNewDeal] = useState({
     title: '',
@@ -49,7 +48,6 @@ export default function CRM() {
     responsible_user_id: ''
   })
 
-  // Состояние для облаков (раз в 10 минут)
   const [windActive, setWindActive] = useState(false)
 
   useEffect(() => {
@@ -88,12 +86,10 @@ export default function CRM() {
     if (savedCalls) setCalls(parseInt(savedCalls))
     setLoading(false)
 
-    // Первый запуск облаков через 10 минут
     const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
     return () => clearTimeout(timeout)
   }
 
-  // Управление облаками
   useEffect(() => {
     if (!windActive) return
     const timer = setTimeout(() => setWindActive(false), 20000)
@@ -172,7 +168,13 @@ export default function CRM() {
     alert('Сделка создана')
   }
 
-  if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
+  if (loading) {
+    return (
+      <div className="loading-leaf-container">
+        <div className="loading-leaf"></div>
+      </div>
+    )
+  }
 
   if (needsLogin) {
     return (
@@ -312,7 +314,6 @@ export default function CRM() {
         </div>
       </div>
 
-      {/* Модальное окно создания сделки */}
       {showCreateModal && (
         <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
