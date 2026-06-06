@@ -203,10 +203,15 @@ export default function CRM() {
         </a>
         <div className="topbar-right">
           <a className="planet-link" href="/planet">Моя любимая планета Земля</a>
-          <a href="/deals" style={{ marginLeft: 12, background: 'transparent', color: '#4CAF6A', border: '1px solid #4CAF6A', borderRadius: 8, padding: '6px 14px', fontSize: 13, textDecoration: 'none' }}>Сделки</a>
-          <a href="/chat" style={{ marginLeft: 12, background: 'transparent', color: '#4CAF6A', border: '1px solid #4CAF6A', borderRadius: 8, padding: '6px 14px', fontSize: 13, textDecoration: 'none' }}>Чат</a>
           <a className="topbar-name" href="https://arthurcrm.vercel.app/profile" target="_blank" rel="noopener noreferrer">{displayName}</a>
         </div>
+      </div>
+
+      <div className="section-nav">
+        <a href="/" className="active">Главная</a>
+        <a href="/deals">Сделки</a>
+        <a href="/chat">Чат</a>
+        <a href="/planet">Планета Земля</a>
       </div>
 
       <div className="crm-wrapper">
