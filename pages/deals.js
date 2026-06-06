@@ -104,7 +104,6 @@ export default function DealsPage() {
 
       setLoading(false)
 
-      // Первый пролёт облаков через 10 минут
       const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
       return () => clearTimeout(timeout)
     }
@@ -177,7 +176,13 @@ export default function DealsPage() {
     return { color: '#7AC78F', text: `${days} д.` }
   }
 
-  if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
+  if (loading) {
+    return (
+      <div className="loading-leaf-container">
+        <div className="loading-leaf"></div>
+      </div>
+    )
+  }
 
   if (needsLogin) {
     return (
@@ -260,7 +265,6 @@ export default function DealsPage() {
             </ActionButton>
           </div>
 
-          {/* Канбан-доска */}
           <div style={{
             display: 'flex',
             gap: 16,
@@ -322,7 +326,6 @@ export default function DealsPage() {
             })}
           </div>
 
-          {/* Модальное окно создания сделки */}
           {showCreateModal && (
             <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
               <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -350,7 +353,6 @@ export default function DealsPage() {
             </div>
           )}
 
-          {/* Фокус-режим (карточка сделки) */}
           {focusDeal && (
             <div className="modal-overlay" onClick={() => setFocusDeal(null)}>
               <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -387,7 +389,6 @@ export default function DealsPage() {
             </div>
           )}
 
-          {/* Уведомление */}
           {notification.show && (
             <div style={{
               position: 'fixed', top: 20, right: 20, zIndex: 1100,
