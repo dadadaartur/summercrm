@@ -158,6 +158,7 @@ export default function CRM() {
         <div className="topbar-logo">CRM Лето</div>
         <div className="topbar-right">
           <a className="planet-link" href="/planet">Моя любимая планета Земля</a>
+          <a href="/deals" style={{ marginLeft: 12, background: 'transparent', color: '#4CAF6A', border: '1px solid #4CAF6A', borderRadius: 8, padding: '6px 14px', fontSize: 13, textDecoration: 'none' }}>Сделки</a>
           <a className="topbar-name" href="https://arthurcrm.vercel.app/profile" target="_blank" rel="noopener noreferrer">{displayName}</a>
         </div>
       </div>
