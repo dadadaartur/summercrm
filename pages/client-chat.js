@@ -55,21 +55,27 @@ export default function ClientChat() {
     try {
       const userId = anonymousUser.id
 
-      // 1. Создаём профиль клиента, если его ещё нет
-      const { error: profileError } = await supabase.from('profiles').insert({
-        user_id: userId,
-        email: `${name.toLowerCase().replace(/\s/g, '.')}@client.test`,
-        display_name: name.trim(),
-        role_id: 6,
-        company_id: 1 // замени на ID своей компании, если не 1
-      })
-      // Если профиль уже существует (ошибка уникальности) – это нормально
-      if (profileError && profileError.code !== '23505') {
-        console.warn('Ошибка создания профиля:', profileError)
-        // Не прерываем выполнение, так как профиль мог существовать ранее
+      // Проверяем, существует ли профиль, и создаём только при отсутствии
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (!existingProfile) {
+        const { error: profileError } = await supabase.from('profiles').insert({
+          user_id: userId,
+          email: `${name.toLowerCase().replace(/\s/g, '.')}@client.test`,
+          display_name: name.trim(),
+          role_id: 6,
+          company_id: 1 // замени на ID своей компании, если не 1
+        })
+        if (profileError) {
+          console.warn('Ошибка создания профиля:', profileError)
+        }
       }
 
-      // 2. Создаём сделку
+      // Создаём сделку
       const { data: newDeal, error: dealError } = await supabase
         .from('deals')
         .insert({
@@ -80,13 +86,13 @@ export default function ClientChat() {
           status: 'new',
           priority: 'medium',
           progress: 0,
-          responsible_user_id: userId // привязываем сделку к анониму
+          responsible_user_id: userId
         })
         .select()
         .single()
       if (dealError) throw dealError
 
-      // 3. Создаём чат-сессию
+      // Создаём чат-сессию
       const { data: session, error: sessionError } = await supabase
         .from('chat_sessions')
         .insert({
@@ -100,7 +106,7 @@ export default function ClientChat() {
         .single()
       if (sessionError) throw sessionError
 
-      // 4. Первое сообщение (оптимистично)
+      // Отправляем первое сообщение (оптимистично)
       setSessionId(session.id)
       const firstMsg = {
         id: Date.now(),
