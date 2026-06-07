@@ -700,10 +700,10 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link, .quick-template
 
 .chat-load-more:hover { text-decoration: underline; }
 
-/* Виджет метрик (правый верхний угол) */
+/* Виджет метрик (правый верхний угол, теперь ниже, чтобы не перекрывал навигацию) */
 .metrics-widget {
   position: fixed;
-  top: 88px;
+  top: 100px;
   right: 20px;
   z-index: 500;
   background: white;
