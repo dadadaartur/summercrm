@@ -88,6 +88,7 @@ export default function ChatPage() {
           setOperatorAvgRating(avg.toFixed(1))
         }
 
+        // Определяем сессию: по sessionId или по dealId в URL
         const sid = router.query.sessionId
         const did = router.query.dealId
 
@@ -102,6 +103,7 @@ export default function ChatPage() {
               operator_message_count: sess.operator_message_count || 0,
               auto_rating: sess.auto_rating
             })
+            // Загружаем данные клиента
             if (sess.client_id) {
               const { data: cl } = await supabase.from('profiles').select('user_id, email, display_name').eq('user_id', sess.client_id).maybeSingle()
               if (cl) setClient({ id: cl.user_id, name: cl.display_name || cl.email, email: cl.email, phone: '', status: 'клиент', priority: 'medium' })
@@ -109,6 +111,7 @@ export default function ChatPage() {
             await loadMessages(sid)
           }
         } else if (did) {
+          // Найти сессию по сделке или создать новую
           const { data: sess } = await supabase.from('chat_sessions').select('*').eq('deal_id', did).maybeSingle()
           if (sess) {
             router.replace(`/chat?sessionId=${sess.id}`)
@@ -255,11 +258,11 @@ export default function ChatPage() {
         <div className="topbar-right"><span className="topbar-name">{user?.email}</span></div>
       </div>
 
-      {/* Виджет метрик больше не отображается отдельно — он внутри левой панели */}
+      {/* Виджет метрик теперь внутри левой панели чата, поэтому здесь его нет */}
 
       <div className="chat-container">
         <div className="chat-left-panel">
-          {/* Блок метрик */}
+          {/* Блок метрик, встроенный в левую панель */}
           <div style={{ background: '#F2F9F4', borderRadius: '16px', padding: '16px', display: 'flex', gap: '16px', marginBottom: '16px', border: '1px solid #E5F0E8' }}>
             <div style={{ textAlign: 'center', flex: 1 }}>
               <div style={{ fontSize: '20px', fontWeight: 700, color: '#4CAF6A' }}>{metrics.openDeals}</div>
