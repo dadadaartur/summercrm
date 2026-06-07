@@ -1,31 +1,10 @@
-/* ===== СБРОС И ГЛОБАЛЬНЫЙ ЗАПРЕТ КУРСОРОВ ===== */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-}
-
-html, body, div, span, p, h1, h2, h3, h4, h5, h6, a, button, svg,
-li, ul, ol, table, tr, td, th, section, header, footer, nav, aside,
-main, article, form, label, input[type="checkbox"], input[type="radio"],
-select, option, textarea, [contenteditable="false"] {
   cursor: default !important;
 }
 
-input[type="text"], input[type="email"], input[type="password"],
-input[type="number"], input[type="search"], input[type="tel"],
-input[type="url"], textarea, [contenteditable="true"] {
-  cursor: text !important;
-}
-
-a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link,
-.quick-templates-btn, .chat-send-btn, .deal-card, .modal-overlay,
-.chat-load-more, .chat-tab, .chat-template-btn, .chat-action-btn,
-.quick-template-btn, .hotkey-item {
-  cursor: pointer !important;
-}
-
-/* ===== ОСТАЛЬНЫЕ СТИЛИ ===== */
 html, body {
   margin: 0;
   padding: 0;
@@ -34,6 +13,14 @@ html, body {
   color: #1F2E23;
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+input, textarea, [contenteditable="true"] {
+  cursor: text !important;
+}
+
+a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link, .quick-templates-btn {
+  cursor: pointer !important;
 }
 
 /* Верхняя панель */
@@ -713,28 +700,6 @@ html, body {
 
 .chat-load-more:hover { text-decoration: underline; }
 
-/* Виджет метрик (правый верхний угол, теперь выше и не перекрывает) */
-.metrics-widget {
-  position: fixed;
-  top: 110px;           /* достаточно, чтобы не заезжать на навигацию */
-  right: 20px;
-  z-index: 500;
-  background: rgba(255,255,255,0.9);
-  border: 1px solid #E5F0E8;
-  border-radius: 16px;
-  padding: 12px 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  display: flex;
-  gap: 16px;
-  font-size: 12px;
-  max-width: 220px;
-  backdrop-filter: blur(4px);
-}
-
-.metrics-widget-item { text-align: center; }
-.metrics-widget-value { font-size: 20px; font-weight: 700; color: #4CAF6A; }
-.metrics-widget-label { font-size: 11px; color: #5B7465; }
-
 /* Адаптивность */
 @media (max-width: 768px) {
   .crm-wrapper { flex-direction: column; }
@@ -742,6 +707,5 @@ html, body {
   .deal-card { min-width: auto; width: calc(100% - 32px); }
   .chat-container { flex-direction: column; }
   .chat-left-panel, .chat-right-panel { width: 100%; min-width: auto; height: auto; }
-  .chat-right-panel { display: none; }   /* скрываем правую панель на узких экранах */
-  .metrics-widget { top: auto; bottom: 20px; right: 20px; }
+  .chat-right-panel { border-left: none; border-top: 1px solid #E5F0E8; }
 }
