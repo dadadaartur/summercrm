@@ -39,9 +39,6 @@ export default function CRM() {
   const [goals, setGoals] = useState([])
 
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [employees, setEmployees] = useState([])
-  const [formErrors, setFormErrors] = useState({})
-
   const [newDeal, setNewDeal] = useState({
     title: '',
     description: '',
@@ -53,11 +50,6 @@ export default function CRM() {
   })
 
   const [windActive, setWindActive] = useState(false)
-
-  // Статистика воронки
-  const [funnelStats, setFunnelStats] = useState({ new: 0, qualification: 0, proposal: 0, negotiation: 0, won: 0, lost: 0 })
-  // Счётчик активных чатов (для кнопки «Чат»)
-  const [activeChatsCount, setActiveChatsCount] = useState(0)
 
   useEffect(() => {
     if (!router.isReady) return
@@ -81,66 +73,22 @@ export default function CRM() {
   }, [router.isReady, router.query])
 
   const loadAll = async (userId) => {
-    try {
-      // Профиль
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, avatar_url, position_id, positions(title)')
-        .eq('user_id', userId)
-        .single()
+    const [{ data: profileData }, { data: balanceData }, { data: taskAssignments }, { data: goalsData }] = await Promise.all([
+      supabase.from('profiles').select('first_name, last_name, avatar_url, position_id, positions(title)').eq('user_id', userId).single(),
+      supabase.from('karma_balance').select('balance').eq('user_id', userId).single(),
+      supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', userId).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
+      supabase.from('goals').select('*').eq('user_id', userId).eq('is_active', true).order('period')
+    ])
+    if (profileData) setProfile(profileData)
+    if (balanceData) setBalance(balanceData.balance)
+    if (taskAssignments) setTasks(taskAssignments)
+    if (goalsData) setGoals(goalsData)
+    const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
+    if (savedCalls) setCalls(parseInt(savedCalls))
+    setLoading(false)
 
-      if (!profileData) { setNeedsLogin(true); setLoading(false); return }
-      setProfile(profileData)
-      const companyId = profileData.company_id
-
-      // Параллельная загрузка
-      const [
-        { data: balanceData },
-        { data: taskAssignments },
-        { data: goalsData },
-        { data: employeesData },
-        { data: funnelData, error: funnelError }
-      ] = await Promise.all([
-        supabase.from('karma_balance').select('balance').eq('user_id', userId).single(),
-        supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', userId).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
-        supabase.from('goals').select('*').eq('user_id', userId).eq('is_active', true).order('period'),
-        supabase.from('profiles').select('user_id, display_name, email').eq('company_id', companyId).not('role_id', 'in', '(1,2)').is('deleted_at', null),
-        supabase.rpc('get_deals_stats', { comp_id: companyId })
-      ])
-
-      if (balanceData) setBalance(balanceData.balance)
-      if (taskAssignments) setTasks(taskAssignments)
-      if (goalsData) setGoals(goalsData)
-      if (employeesData) setEmployees(employeesData)
-
-      // Статистика воронки из БД
-      if (funnelData && !funnelError) {
-        const stats = { new: 0, qualification: 0, proposal: 0, negotiation: 0, won: 0, lost: 0 }
-        funnelData.forEach(row => {
-          if (stats.hasOwnProperty(row.status)) stats[row.status] = row.count
-        })
-        setFunnelStats(stats)
-      }
-
-      // Счётчик активных чатов (сессии со статусом 'active')
-      const { count: chatCount } = await supabase
-        .from('chat_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-        .eq('status', 'active')
-      setActiveChatsCount(chatCount || 0)
-
-      const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
-      if (savedCalls) setCalls(parseInt(savedCalls))
-
-      setLoading(false)
-
-      const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
-      return () => clearTimeout(timeout)
-    } catch (error) {
-      console.error('Ошибка загрузки данных:', error)
-      setLoading(false)
-    }
+    const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
+    return () => clearTimeout(timeout)
   }
 
   useEffect(() => {
@@ -198,22 +146,13 @@ export default function CRM() {
     if (updatedAssignments) setTasks(updatedAssignments)
   }
 
-  const validateDealForm = () => {
-    const errors = {}
-    if (!newDeal.title.trim()) errors.title = 'Обязательное поле'
-    if (!newDeal.client_name.trim()) errors.client_name = 'Обязательное поле'
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
   const handleCreateDeal = async () => {
-    if (!validateDealForm()) return
-
+    if (!newDeal.title.trim()) return
     const { error } = await supabase.from('deals').insert({
       company_id: profile.company_id,
-      title: newDeal.title.trim(),
-      description: newDeal.description.trim(),
-      client_name: newDeal.client_name.trim(),
+      title: newDeal.title,
+      description: newDeal.description,
+      client_name: newDeal.client_name,
       amount: parseFloat(newDeal.amount) || null,
       priority: newDeal.priority,
       deadline: newDeal.deadline || null,
@@ -227,16 +166,7 @@ export default function CRM() {
     }
     setShowCreateModal(false)
     setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
-    setFormErrors({})
-    // Обновляем статистику воронки
-    if (profile?.company_id) {
-      const { data: funnelData } = await supabase.rpc('get_deals_stats', { comp_id: profile.company_id })
-      if (funnelData) {
-        const stats = { new: 0, qualification: 0, proposal: 0, negotiation: 0, won: 0, lost: 0 }
-        funnelData.forEach(row => { if (stats.hasOwnProperty(row.status)) stats[row.status] = row.count })
-        setFunnelStats(stats)
-      }
-    }
+    alert('Сделка создана')
   }
 
   if (loading) {
@@ -253,7 +183,8 @@ export default function CRM() {
         <div style={{ textAlign: 'center', background: 'white', padding: '48px', borderRadius: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <h2 style={{ marginBottom: '16px', fontWeight: 600, color: '#2D6A4F' }}>Добро пожаловать в CRM Лето</h2>
           <p style={{ marginBottom: '24px', color: '#5B7465' }}>Для работы с CRM необходимо авторизоваться в Кармическом банке</p>
-          <a href="https://arthurcrm.vercel.app/login" style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}>
+          <a href="https://arthurcrm.vercel.app/login?message=Для+доступа+в+CRM+авторизуйтесь+в+Кармическом+банке"
+             style={{ display: 'inline-block', background: '#4CAF6A', color: 'white', padding: '12px 32px', borderRadius: '14px', textDecoration: 'none', fontWeight: 500 }}>
             Войти в Кармический банк
           </a>
         </div>
@@ -278,9 +209,7 @@ export default function CRM() {
 
       <div className="nav-panel">
         <Link href="/deals" className="nav-link">Сделки</Link>
-        <Link href="/chat" className="nav-link">
-          Чат {activeChatsCount > 0 && <span style={{ background: '#EF4444', color: 'white', borderRadius: '50%', padding: '2px 6px', fontSize: 11, marginLeft: 6 }}>{activeChatsCount}</span>}
-        </Link>
+        <Link href="/chat" className="nav-link">Чат</Link>
         <span className="nav-link">Звонки</span>
       </div>
 
@@ -358,14 +287,13 @@ export default function CRM() {
               </div>
             )}
 
-            {/* Воронка продаж (реальные данные) */}
             <div className="panel">
               <h3>Воронка продаж</h3>
-              <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width: `${Math.min(100, (funnelStats.new / Math.max(1, Object.values(funnelStats).reduce((a,b)=>a+b,0))) * 100)}%`}}></div></div><span className="stage-count">{funnelStats.new} сделок</span></div>
-              <div className="funnel-stage"><span className="stage-name">Квалификация</span><div className="stage-bar"><div className="stage-fill" style={{width: `${Math.min(100, (funnelStats.qualification / Math.max(1, Object.values(funnelStats).reduce((a,b)=>a+b,0))) * 100)}%`}}></div></div><span className="stage-count">{funnelStats.qualification} сделок</span></div>
-              <div className="funnel-stage"><span className="stage-name">Предложение</span><div className="stage-bar"><div className="stage-fill" style={{width: `${Math.min(100, (funnelStats.proposal / Math.max(1, Object.values(funnelStats).reduce((a,b)=>a+b,0))) * 100)}%`}}></div></div><span className="stage-count">{funnelStats.proposal} сделок</span></div>
-              <div className="funnel-stage"><span className="stage-name">Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width: `${Math.min(100, (funnelStats.negotiation / Math.max(1, Object.values(funnelStats).reduce((a,b)=>a+b,0))) * 100)}%`}}></div></div><span className="stage-count">{funnelStats.negotiation} сделок</span></div>
-              <div className="funnel-stage"><span className="stage-name">Успешно</span><div className="stage-bar"><div className="stage-fill" style={{width: `${Math.min(100, (funnelStats.won / Math.max(1, Object.values(funnelStats).reduce((a,b)=>a+b,0))) * 100)}%`}}></div></div><span className="stage-count">{funnelStats.won} сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width:'80%'}}></div></div><span className="stage-count">12 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Квалификация</span><div className="stage-bar"><div className="stage-fill" style={{width:'55%'}}></div></div><span className="stage-count">8 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Предложение</span><div className="stage-bar"><div className="stage-fill" style={{width:'40%'}}></div></div><span className="stage-count">5 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width:'25%'}}></div></div><span className="stage-count">3 сделки</span></div>
+              <div className="funnel-stage"><span className="stage-name">Закрыто</span><div className="stage-bar"><div className="stage-fill" style={{width:'15%'}}></div></div><span className="stage-count">2 сделки</span></div>
             </div>
           </div>
 
@@ -404,12 +332,11 @@ export default function CRM() {
                   Название сделки <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
-                  className={`input-field ${formErrors.title ? 'border-red-400' : ''}`}
+                  className="input-field"
                   placeholder="Краткое описание сути"
                   value={newDeal.title}
-                  onChange={e => { setNewDeal({...newDeal, title: e.target.value}); if (formErrors.title) setFormErrors({...formErrors, title: null}) }}
+                  onChange={e => setNewDeal({...newDeal, title: e.target.value})}
                 />
-                {formErrors.title && <div style={{ color: '#EF4444', fontSize: 12, marginTop: 2 }}>{formErrors.title}</div>}
               </div>
 
               <div>
@@ -417,12 +344,11 @@ export default function CRM() {
                   Клиент <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
-                  className={`input-field ${formErrors.client_name ? 'border-red-400' : ''}`}
+                  className="input-field"
                   placeholder="Компания или ФИО"
                   value={newDeal.client_name}
-                  onChange={e => { setNewDeal({...newDeal, client_name: e.target.value}); if (formErrors.client_name) setFormErrors({...formErrors, client_name: null}) }}
+                  onChange={e => setNewDeal({...newDeal, client_name: e.target.value})}
                 />
-                {formErrors.client_name && <div style={{ color: '#EF4444', fontSize: 12, marginTop: 2 }}>{formErrors.client_name}</div>}
               </div>
 
               <div>
@@ -448,14 +374,6 @@ export default function CRM() {
                 <input className="input-field" type="date" value={newDeal.deadline} onChange={e => setNewDeal({...newDeal, deadline: e.target.value})} />
               </div>
 
-              <div>
-                <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Ответственный</label>
-                <select className="input-field" value={newDeal.responsible_user_id} onChange={e => setNewDeal({...newDeal, responsible_user_id: e.target.value})}>
-                  <option value="">Не назначен</option>
-                  {employees.map(emp => <option key={emp.user_id} value={emp.user_id}>{emp.display_name || emp.email}</option>)}
-                </select>
-              </div>
-
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Описание</label>
                 <textarea className="input-field" rows={4} placeholder="Детали, особые условия, примечания" value={newDeal.description} onChange={e => setNewDeal({...newDeal, description: e.target.value})} />
@@ -463,7 +381,7 @@ export default function CRM() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-              <ActionButton onClick={() => { setShowCreateModal(false); setFormErrors({}) }}>Отмена</ActionButton>
+              <ActionButton onClick={() => setShowCreateModal(false)}>Отмена</ActionButton>
               <ActionButton primary onClick={handleCreateDeal}>Создать</ActionButton>
             </div>
           </div>
