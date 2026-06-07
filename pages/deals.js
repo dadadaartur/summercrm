@@ -120,7 +120,6 @@ export default function DealsPage() {
     init()
   }, [])
 
-  // Облака
   useEffect(() => {
     if (!windActive) return
     const timer = setTimeout(() => setWindActive(false), 20000)
@@ -133,7 +132,7 @@ export default function DealsPage() {
     return () => clearInterval(interval)
   }, [windActive])
 
-  // Real-time подписка на изменения сделок
+  // Realtime-подписка на изменения сделок
   useEffect(() => {
     const dealsChannel = supabase
       .channel('kanban_deals_realtime')
@@ -143,7 +142,6 @@ export default function DealsPage() {
         (payload) => {
           if (payload.eventType === 'INSERT') {
             setDeals(prev => {
-              // Исключаем дубликаты
               if (prev.find(d => d.id === payload.new.id)) return prev
               return [payload.new, ...prev]
             })
@@ -201,7 +199,6 @@ export default function DealsPage() {
       return
     }
 
-    // Локально добавлять не нужно – real-time вставка сама добавит
     setShowCreateModal(false)
     setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
     setFormErrors({})
@@ -215,15 +212,27 @@ export default function DealsPage() {
       .eq('id', dealId)
 
     if (!error) {
-      // real-time обновит состояние
       setFocusDeal(null)
     } else {
       showNotification('Ошибка обновления статуса')
     }
   }
 
+  const takeDeal = async (dealId) => {
+    const { error } = await supabase
+      .from('deals')
+      .update({ responsible_user_id: user.id, status: 'qualification' })
+      .eq('id', dealId)
+      .eq('status', 'new')
+
+    if (!error) {
+      showNotification('Сделка взята в работу')
+    } else {
+      showNotification('Ошибка при взятии сделки')
+    }
+  }
+
   const openChatForDeal = async (deal) => {
-    // Ищем или создаём чат-сессию, связанную с этой сделкой
     const { data: existingSession } = await supabase
       .from('chat_sessions')
       .select('id')
@@ -233,12 +242,11 @@ export default function DealsPage() {
     if (existingSession) {
       router.push(`/chat?sessionId=${existingSession.id}`)
     } else {
-      // Создаём новую сессию и привязываем к сделке
       const { data: newSession } = await supabase
         .from('chat_sessions')
         .insert({
           company_id: profile.company_id,
-          client_id: deal.responsible_user_id, // или null
+          client_id: deal.responsible_user_id,
           deal_id: deal.id,
           status: 'active',
           subject: `Сделка: ${deal.title}`
@@ -379,22 +387,21 @@ export default function DealsPage() {
                             </div>
                           )}
                           {deal.responsible && <div style={{ fontSize: 11, color: '#9AA9C1', marginTop: 4 }}>{deal.responsible.display_name || deal.responsible.email}</div>}
-                          {/* Кнопка Чат */}
-                          <div style={{ marginTop: 8 }}>
+                          <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
                             <button
                               onClick={(e) => { e.stopPropagation(); openChatForDeal(deal); }}
-                              style={{
-                                background: 'transparent',
-                                border: '1px solid #4CAF6A',
-                                color: '#4CAF6A',
-                                borderRadius: 8,
-                                padding: '4px 12px',
-                                fontSize: 12,
-                                cursor: 'pointer'
-                              }}
+                              style={{ background: 'transparent', border: '1px solid #4CAF6A', color: '#4CAF6A', borderRadius: 8, padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}
                             >
                               Чат
                             </button>
+                            {deal.status === 'new' && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); takeDeal(deal.id); }}
+                                style={{ background: '#4CAF6A', border: 'none', color: 'white', borderRadius: 8, padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}
+                              >
+                                Взять в работу
+                              </button>
+                            )}
                           </div>
                         </div>
                       )
