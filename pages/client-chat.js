@@ -12,7 +12,7 @@ export default function ClientChat() {
   const messagesEndRef = useRef(null)
   const [anonymousUser, setAnonymousUser] = useState(null)
 
-  // При заходе на страницу автоматически выполняем анонимный вход
+  // Автоматический анонимный вход
   useEffect(() => {
     const init = async () => {
       const { data, error } = await supabase.auth.signInAnonymously()
@@ -30,7 +30,7 @@ export default function ClientChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatMessages])
 
-  // Подписка на новые сообщения (Realtime)
+  // Подписка на новые сообщения
   useEffect(() => {
     if (!sessionId) return
     const channel = supabase
@@ -55,17 +55,18 @@ export default function ClientChat() {
     try {
       const userId = anonymousUser.id
 
-      // 1. Создаём профиль клиента
+      // 1. Создаём профиль клиента, если его ещё нет
       const { error: profileError } = await supabase.from('profiles').insert({
         user_id: userId,
         email: `${name.toLowerCase().replace(/\s/g, '.')}@client.test`,
         display_name: name.trim(),
         role_id: 6,
-        company_id: 1 // измени на ID своей компании, если не 1
+        company_id: 1 // замени на ID своей компании, если не 1
       })
-      // Профиль может уже существовать — это не критично
+      // Если профиль уже существует (ошибка уникальности) – это нормально
       if (profileError && profileError.code !== '23505') {
         console.warn('Ошибка создания профиля:', profileError)
+        // Не прерываем выполнение, так как профиль мог существовать ранее
       }
 
       // 2. Создаём сделку
@@ -78,13 +79,14 @@ export default function ClientChat() {
           description: message.trim(),
           status: 'new',
           priority: 'medium',
-          progress: 0
+          progress: 0,
+          responsible_user_id: userId // привязываем сделку к анониму
         })
         .select()
         .single()
       if (dealError) throw dealError
 
-      // 3. Создаём чат-сессию, привязанную к сделке
+      // 3. Создаём чат-сессию
       const { data: session, error: sessionError } = await supabase
         .from('chat_sessions')
         .insert({
@@ -98,7 +100,7 @@ export default function ClientChat() {
         .single()
       if (sessionError) throw sessionError
 
-      // 4. Отправляем первое сообщение (оптимистично)
+      // 4. Первое сообщение (оптимистично)
       setSessionId(session.id)
       const firstMsg = {
         id: Date.now(),
@@ -131,7 +133,6 @@ export default function ClientChat() {
     const textToSend = message.trim()
     setMessage('')
 
-    // Оптимистичное отображение
     const temporaryMessage = {
       id: Date.now(),
       session_id: sessionId,
@@ -141,7 +142,6 @@ export default function ClientChat() {
     }
     setChatMessages(prev => [...prev, temporaryMessage])
 
-    // Отправка в базу
     try {
       const { error } = await supabase.from('chat_messages').insert({
         session_id: sessionId,
