@@ -120,6 +120,7 @@ export default function DealsPage() {
     init()
   }, [])
 
+  // Облака
   useEffect(() => {
     if (!windActive) return
     const timer = setTimeout(() => setWindActive(false), 20000)
@@ -131,6 +132,36 @@ export default function DealsPage() {
     const interval = setInterval(() => setWindActive(true), 10 * 60 * 1000)
     return () => clearInterval(interval)
   }, [windActive])
+
+  // Real-time подписка на изменения сделок
+  useEffect(() => {
+    const dealsChannel = supabase
+      .channel('kanban_deals_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'deals' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setDeals(prev => {
+              // Исключаем дубликаты
+              if (prev.find(d => d.id === payload.new.id)) return prev
+              return [payload.new, ...prev]
+            })
+          }
+          if (payload.eventType === 'UPDATE') {
+            setDeals(prev => prev.map(d => d.id === payload.new.id ? { ...d, ...payload.new } : d))
+          }
+          if (payload.eventType === 'DELETE') {
+            setDeals(prev => prev.filter(d => d.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(dealsChannel)
+    }
+  }, [])
 
   const showNotification = (msg) => {
     setNotification({ show: true, message: msg })
@@ -170,7 +201,7 @@ export default function DealsPage() {
       return
     }
 
-    setDeals(prev => [data, ...prev])
+    // Локально добавлять не нужно – real-time вставка сама добавит
     setShowCreateModal(false)
     setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
     setFormErrors({})
@@ -184,10 +215,38 @@ export default function DealsPage() {
       .eq('id', dealId)
 
     if (!error) {
-      setDeals(prev => prev.map(deal => deal.id === dealId ? { ...deal, status: newStatus } : deal))
+      // real-time обновит состояние
       setFocusDeal(null)
     } else {
       showNotification('Ошибка обновления статуса')
+    }
+  }
+
+  const openChatForDeal = async (deal) => {
+    // Ищем или создаём чат-сессию, связанную с этой сделкой
+    const { data: existingSession } = await supabase
+      .from('chat_sessions')
+      .select('id')
+      .eq('deal_id', deal.id)
+      .maybeSingle()
+
+    if (existingSession) {
+      router.push(`/chat?sessionId=${existingSession.id}`)
+    } else {
+      // Создаём новую сессию и привязываем к сделке
+      const { data: newSession } = await supabase
+        .from('chat_sessions')
+        .insert({
+          company_id: profile.company_id,
+          client_id: deal.responsible_user_id, // или null
+          deal_id: deal.id,
+          status: 'active',
+          subject: `Сделка: ${deal.title}`
+        })
+        .select('id')
+        .single()
+      if (newSession) router.push(`/chat?sessionId=${newSession.id}`)
+      else showNotification('Не удалось создать чат')
     }
   }
 
@@ -320,6 +379,23 @@ export default function DealsPage() {
                             </div>
                           )}
                           {deal.responsible && <div style={{ fontSize: 11, color: '#9AA9C1', marginTop: 4 }}>{deal.responsible.display_name || deal.responsible.email}</div>}
+                          {/* Кнопка Чат */}
+                          <div style={{ marginTop: 8 }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openChatForDeal(deal); }}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid #4CAF6A',
+                                color: '#4CAF6A',
+                                borderRadius: 8,
+                                padding: '4px 12px',
+                                fontSize: 12,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Чат
+                            </button>
+                          </div>
                         </div>
                       )
                     })}
@@ -337,7 +413,6 @@ export default function DealsPage() {
                 </h3>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px' }}>
-                  {/* Название */}
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>
                       Название сделки <span style={{ color: '#EF4444' }}>*</span>
@@ -351,7 +426,6 @@ export default function DealsPage() {
                     {formErrors.title && <div style={{ color: '#EF4444', fontSize: 12, marginTop: 2 }}>{formErrors.title}</div>}
                   </div>
 
-                  {/* Клиент */}
                   <div>
                     <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>
                       Клиент <span style={{ color: '#EF4444' }}>*</span>
@@ -365,80 +439,40 @@ export default function DealsPage() {
                     {formErrors.client_name && <div style={{ color: '#EF4444', fontSize: 12, marginTop: 2 }}>{formErrors.client_name}</div>}
                   </div>
 
-                  {/* Сумма */}
                   <div>
                     <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Сумма сделки (₽)</label>
-                    <input
-                      className="input-field"
-                      type="number"
-                      placeholder="0"
-                      value={newDeal.amount}
-                      onChange={e => setNewDeal({...newDeal, amount: e.target.value})}
-                    />
+                    <input className="input-field" type="number" placeholder="0" value={newDeal.amount} onChange={e => setNewDeal({...newDeal, amount: e.target.value})} />
                   </div>
 
-                  {/* Приоритет */}
                   <div>
                     <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Приоритет</label>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center', height: 42 }}>
                       {['low', 'medium', 'high', 'urgent'].map(level => (
                         <label key={level} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-                          <input
-                            type="radio"
-                            name="priority"
-                            value={level}
-                            checked={newDeal.priority === level}
-                            onChange={e => setNewDeal({...newDeal, priority: e.target.value})}
-                            style={{ accentColor: '#4CAF6A' }}
-                          />
-                          <span style={{
-                            width: 12, height: 12, borderRadius: 4,
-                            backgroundColor: level === 'low' ? '#7AC78F' : level === 'medium' ? '#F4B860' : level === 'high' ? '#F28B82' : '#EF4444'
-                          }} />
-                          <span style={{ fontSize: 13, color: '#1F2E23' }}>
-                            {level === 'low' ? 'Низкий' : level === 'medium' ? 'Средний' : level === 'high' ? 'Высокий' : 'Критичный'}
-                          </span>
+                          <input type="radio" name="priority" value={level} checked={newDeal.priority === level} onChange={e => setNewDeal({...newDeal, priority: e.target.value})} style={{ accentColor: '#4CAF6A' }} />
+                          <span style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: level === 'low' ? '#7AC78F' : level === 'medium' ? '#F4B860' : level === 'high' ? '#F28B82' : '#EF4444' }} />
+                          <span style={{ fontSize: 13, color: '#1F2E23' }}>{level === 'low' ? 'Низкий' : level === 'medium' ? 'Средний' : level === 'high' ? 'Высокий' : 'Критичный'}</span>
                         </label>
                       ))}
                     </div>
                   </div>
 
-                  {/* Дедлайн */}
                   <div>
                     <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Дедлайн</label>
-                    <input
-                      className="input-field"
-                      type="date"
-                      value={newDeal.deadline}
-                      onChange={e => setNewDeal({...newDeal, deadline: e.target.value})}
-                    />
+                    <input className="input-field" type="date" value={newDeal.deadline} onChange={e => setNewDeal({...newDeal, deadline: e.target.value})} />
                   </div>
 
-                  {/* Ответственный */}
                   <div>
                     <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Ответственный</label>
-                    <select
-                      className="input-field"
-                      value={newDeal.responsible_user_id}
-                      onChange={e => setNewDeal({...newDeal, responsible_user_id: e.target.value})}
-                    >
+                    <select className="input-field" value={newDeal.responsible_user_id} onChange={e => setNewDeal({...newDeal, responsible_user_id: e.target.value})}>
                       <option value="">Не назначен</option>
-                      {employees.map(emp => (
-                        <option key={emp.user_id} value={emp.user_id}>{emp.display_name || emp.email}</option>
-                      ))}
+                      {employees.map(emp => <option key={emp.user_id} value={emp.user_id}>{emp.display_name || emp.email}</option>)}
                     </select>
                   </div>
 
-                  {/* Описание */}
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Описание</label>
-                    <textarea
-                      className="input-field"
-                      rows={4}
-                      placeholder="Детали, особые условия, примечания"
-                      value={newDeal.description}
-                      onChange={e => setNewDeal({...newDeal, description: e.target.value})}
-                    />
+                    <textarea className="input-field" rows={4} placeholder="Детали, особые условия, примечания" value={newDeal.description} onChange={e => setNewDeal({...newDeal, description: e.target.value})} />
                   </div>
                 </div>
 
