@@ -1,31 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import Link from 'next/link'
 import { supabase } from '../lib/supabaseClient'
-
-function ActionButton({ children, onClick, primary = false, style = {} }) {
-  return (
-    <button
-      onClick={onClick}
-      className={primary ? 'action-btn primary' : 'action-btn'}
-      style={{
-        padding: '10px 24px',
-        borderRadius: '12px',
-        border: 'none',
-        backgroundColor: primary ? '#4CAF6A' : '#F2F9F4',
-        color: primary ? 'white' : '#5B7465',
-        cursor: 'pointer',
-        fontSize: '14px',
-        fontWeight: 500,
-        transition: 'all 0.2s',
-        ...style
-      }}
-    >
-      {children}
-    </button>
-  )
-}
 
 export default function CRM() {
   const router = useRouter()
@@ -37,24 +13,6 @@ export default function CRM() {
   const [loading, setLoading] = useState(true)
   const [needsLogin, setNeedsLogin] = useState(false)
   const [goals, setGoals] = useState([])
-
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newDeal, setNewDeal] = useState({
-    title: '',
-    description: '',
-    client_name: '',
-    amount: '',
-    priority: 'medium',
-    deadline: '',
-    responsible_user_id: ''
-  })
-
-  const [windActive, setWindActive] = useState(false)
-
-  // Данные для реальной воронки
-  const [funnel, setFunnel] = useState({ new: 0, qualification: 0, proposal: 0, negotiation: 0, won: 0 })
-  // Счётчик активных чатов
-  const [activeChats, setActiveChats] = useState(0)
 
   useEffect(() => {
     if (!router.isReady) return
@@ -78,69 +36,21 @@ export default function CRM() {
   }, [router.isReady, router.query])
 
   const loadAll = async (userId) => {
-    try {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, avatar_url, position_id, positions(title)')
-        .eq('user_id', userId)
-        .single()
-
-      if (!profileData) { setNeedsLogin(true); setLoading(false); return }
-      setProfile(profileData)
-      const companyId = profileData.company_id
-
-      const [
-        { data: balanceData },
-        { data: taskAssignments },
-        { data: goalsData },
-        { data: dealsData },
-        { count: chatCount }
-      ] = await Promise.all([
-        supabase.from('karma_balance').select('balance').eq('user_id', userId).single(),
-        supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', userId).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
-        supabase.from('goals').select('*').eq('user_id', userId).eq('is_active', true).order('period'),
-        supabase.from('deals').select('status').eq('company_id', companyId),
-        supabase.from('chat_sessions').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'active')
-      ])
-
-      if (balanceData) setBalance(balanceData.balance)
-      if (taskAssignments) setTasks(taskAssignments)
-      if (goalsData) setGoals(goalsData)
-
-      if (dealsData) {
-        const stats = { new: 0, qualification: 0, proposal: 0, negotiation: 0, won: 0 }
-        dealsData.forEach(d => { if (stats.hasOwnProperty(d.status)) stats[d.status]++ })
-        setFunnel(stats)
-      }
-
-      setActiveChats(chatCount || 0)
-
-      const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
-      if (savedCalls) setCalls(parseInt(savedCalls))
-
-      setLoading(false)
-
-      const timeout = setTimeout(() => setWindActive(true), 10 * 60 * 1000)
-      return () => clearTimeout(timeout)
-    } catch (err) {
-      console.error('Ошибка загрузки:', err)
-      setLoading(false)
-    }
+    const [{ data: profileData }, { data: balanceData }, { data: taskAssignments }, { data: goalsData }] = await Promise.all([
+      supabase.from('profiles').select('first_name, last_name, avatar_url, position_id, positions(title)').eq('user_id', userId).single(),
+      supabase.from('karma_balance').select('balance').eq('user_id', userId).single(),
+      supabase.from('task_assignments').select('id, status, task_id, tasks!inner(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', userId).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm'),
+      supabase.from('goals').select('*').eq('user_id', userId).eq('is_active', true).order('period')
+    ])
+    if (profileData) setProfile(profileData)
+    if (balanceData) setBalance(balanceData.balance)
+    if (taskAssignments) setTasks(taskAssignments)
+    if (goalsData) setGoals(goalsData)
+    const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
+    if (savedCalls) setCalls(parseInt(savedCalls))
+    setLoading(false)
   }
 
-  useEffect(() => {
-    if (!windActive) return
-    const timer = setTimeout(() => setWindActive(false), 20000)
-    return () => clearTimeout(timer)
-  }, [windActive])
-
-  useEffect(() => {
-    if (windActive) return
-    const interval = setInterval(() => setWindActive(true), 10 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [windActive])
-
-  // ===== Функции addProgress и addCall (обязательно) =====
   const addProgress = async (goalId, currentVal) => {
     const newVal = currentVal + 1
     const goal = goals.find(g => g.id === goalId)
@@ -184,44 +94,7 @@ export default function CRM() {
     if (updatedAssignments) setTasks(updatedAssignments)
   }
 
-  const handleCreateDeal = async () => {
-    if (!newDeal.title.trim()) return
-    const { error } = await supabase.from('deals').insert({
-      company_id: profile.company_id,
-      title: newDeal.title,
-      description: newDeal.description,
-      client_name: newDeal.client_name,
-      amount: parseFloat(newDeal.amount) || null,
-      priority: newDeal.priority,
-      deadline: newDeal.deadline || null,
-      responsible_user_id: newDeal.responsible_user_id || null,
-      status: 'new',
-      progress: 0
-    })
-    if (error) {
-      alert('Ошибка создания сделки')
-      return
-    }
-    setShowCreateModal(false)
-    setNewDeal({ title: '', description: '', client_name: '', amount: '', priority: 'medium', deadline: '', responsible_user_id: '' })
-    // Обновляем воронку локально
-    if (profile?.company_id) {
-      const { data: updatedDeals } = await supabase.from('deals').select('status').eq('company_id', profile.company_id)
-      if (updatedDeals) {
-        const stats = { new: 0, qualification: 0, proposal: 0, negotiation: 0, won: 0 }
-        updatedDeals.forEach(d => { if (stats.hasOwnProperty(d.status)) stats[d.status]++ })
-        setFunnel(stats)
-      }
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="loading-leaf-container">
-        <div className="loading-leaf"></div>
-      </div>
-    )
-  }
+  if (loading) return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#E8F4FD' }}>Загрузка...</div>
 
   if (needsLogin) {
     return (
@@ -245,36 +118,27 @@ export default function CRM() {
   return (
     <>
       <div className="crm-topbar">
-        <Link href="/" className="topbar-logo-link">
-          <span className="back-arrow">←</span> CRM Лето
-        </Link>
+        <div className="topbar-logo">CRM Лето</div>
         <div className="topbar-right">
-          <span className="topbar-name">{displayName}</span>
+          <a className="planet-link" href="/planet">Моя любимая планета Земля</a>
+          <a className="topbar-name" href="https://arthurcrm.vercel.app/profile" target="_blank" rel="noopener noreferrer">{displayName}</a>
         </div>
-      </div>
-
-      <div className="nav-panel">
-        <Link href="/deals" className="nav-link">Сделки</Link>
-        <Link href="/chat" className="nav-link">
-          Чат {activeChats > 0 && <span style={{ background: '#EF4444', color: 'white', borderRadius: '50%', padding: '2px 6px', fontSize: 11, marginLeft: 6 }}>{activeChats}</span>}
-        </Link>
-        <span className="nav-link">Звонки</span>
       </div>
 
       <div className="crm-wrapper">
         <Head>
           <title>CRM Лето</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         </Head>
 
-        <div className={`cloud-bg ${windActive ? 'active' : ''}`}>
+        <div className="cloud-bg">
           <div className="cloud cloud1"></div>
           <div className="cloud cloud2"></div>
           <div className="cloud cloud3"></div>
         </div>
-        <div className={`leaf-container ${windActive ? 'active' : ''}`} />
-
-        <div className="wind-btn" onClick={() => setWindActive(true)} title="Вызвать лёгкий ветер">
+        <div className="leaf-container" id="leafContainer" />
+        <div className="wind-btn" id="windButton" title="Вызвать лёгкий ветер">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 2C12 2 6 7 6 12C6 17 12 20 12 20C12 20 18 17 18 12C18 7 12 2 12 2Z" strokeLinecap="round"/>
             <line x1="12" y1="20" x2="12" y2="22" strokeLinecap="round"/>
@@ -311,7 +175,7 @@ export default function CRM() {
         <div className="main-content">
           <div className="left-col">
             <div className="actions">
-              <button className="action-btn primary" onClick={() => setShowCreateModal(true)}>Новая сделка</button>
+              <button className="action-btn primary">Новая сделка</button>
               <button className="action-btn" onClick={addCall}>Звонок</button>
               <button className="action-btn">Письмо</button>
               <button className="action-btn">Встреча</button>
@@ -337,11 +201,11 @@ export default function CRM() {
 
             <div className="panel">
               <h3>Воронка продаж</h3>
-              <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width: `${(funnel.new / Math.max(1, Object.values(funnel).reduce((a,b)=>a+b))) * 100}%`}}></div></div><span className="stage-count">{funnel.new} сделок</span></div>
-              <div className="funnel-stage"><span className="stage-name">Квалификация</span><div className="stage-bar"><div className="stage-fill" style={{width: `${(funnel.qualification / Math.max(1, Object.values(funnel).reduce((a,b)=>a+b))) * 100}%`}}></div></div><span className="stage-count">{funnel.qualification} сделок</span></div>
-              <div className="funnel-stage"><span className="stage-name">Предложение</span><div className="stage-bar"><div className="stage-fill" style={{width: `${(funnel.proposal / Math.max(1, Object.values(funnel).reduce((a,b)=>a+b))) * 100}%`}}></div></div><span className="stage-count">{funnel.proposal} сделок</span></div>
-              <div className="funnel-stage"><span className="stage-name">Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width: `${(funnel.negotiation / Math.max(1, Object.values(funnel).reduce((a,b)=>a+b))) * 100}%`}}></div></div><span className="stage-count">{funnel.negotiation} сделок</span></div>
-              <div className="funnel-stage"><span className="stage-name">Успешно</span><div className="stage-bar"><div className="stage-fill" style={{width: `${(funnel.won / Math.max(1, Object.values(funnel).reduce((a,b)=>a+b))) * 100}%`}}></div></div><span className="stage-count">{funnel.won} сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width:'80%'}}></div></div><span className="stage-count">12 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Квалификация</span><div className="stage-bar"><div className="stage-fill" style={{width:'55%'}}></div></div><span className="stage-count">8 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Предложение</span><div className="stage-bar"><div className="stage-fill" style={{width:'40%'}}></div></div><span className="stage-count">5 сделок</span></div>
+              <div className="funnel-stage"><span className="stage-name">Переговоры</span><div className="stage-bar"><div className="stage-fill" style={{width:'25%'}}></div></div><span className="stage-count">3 сделки</span></div>
+              <div className="funnel-stage"><span className="stage-name">Закрыто</span><div className="stage-bar"><div className="stage-fill" style={{width:'15%'}}></div></div><span className="stage-count">2 сделки</span></div>
             </div>
           </div>
 
@@ -366,65 +230,6 @@ export default function CRM() {
           </div>
         </div>
       </div>
-
-      {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', padding: '32px' }}>
-            <h3 style={{ fontSize: 22, fontWeight: 600, color: '#1F2E23', marginBottom: 24, borderBottom: '1px solid #E5F0E8', paddingBottom: 12 }}>
-              Новая сделка
-            </h3>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px' }}>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>
-                  Название сделки <span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <input className="input-field" placeholder="Краткое описание сути" value={newDeal.title} onChange={e => setNewDeal({...newDeal, title: e.target.value})} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>
-                  Клиент <span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <input className="input-field" placeholder="Компания или ФИО" value={newDeal.client_name} onChange={e => setNewDeal({...newDeal, client_name: e.target.value})} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Сумма сделки (₽)</label>
-                <input className="input-field" type="number" placeholder="0" value={newDeal.amount} onChange={e => setNewDeal({...newDeal, amount: e.target.value})} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Приоритет</label>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', height: 42 }}>
-                  {['low', 'medium', 'high', 'urgent'].map(level => (
-                    <label key={level} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-                      <input type="radio" name="priority" value={level} checked={newDeal.priority === level} onChange={e => setNewDeal({...newDeal, priority: e.target.value})} style={{ accentColor: '#4CAF6A' }} />
-                      <span style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: level === 'low' ? '#7AC78F' : level === 'medium' ? '#F4B860' : level === 'high' ? '#F28B82' : '#EF4444' }} />
-                      <span style={{ fontSize: 13, color: '#1F2E23' }}>{level === 'low' ? 'Низкий' : level === 'medium' ? 'Средний' : level === 'high' ? 'Высокий' : 'Критичный'}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Дедлайн</label>
-                <input className="input-field" type="date" value={newDeal.deadline} onChange={e => setNewDeal({...newDeal, deadline: e.target.value})} />
-              </div>
-
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ fontSize: 13, color: '#5B7465', marginBottom: 4, display: 'block' }}>Описание</label>
-                <textarea className="input-field" rows={4} placeholder="Детали, особые условия, примечания" value={newDeal.description} onChange={e => setNewDeal({...newDeal, description: e.target.value})} />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-              <ActionButton onClick={() => setShowCreateModal(false)}>Отмена</ActionButton>
-              <ActionButton primary onClick={handleCreateDeal}>Создать</ActionButton>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }
