@@ -10,13 +10,27 @@ export default function ClientChat() {
   const [step, setStep] = useState('form')
   const [sending, setSending] = useState(false)
   const messagesEndRef = useRef(null)
+  const [anonymousUser, setAnonymousUser] = useState(null)
+
+  // При заходе на страницу автоматически выполняем анонимный вход
+  useEffect(() => {
+    const init = async () => {
+      const { data, error } = await supabase.auth.signInAnonymously()
+      if (error) {
+        console.error('Не удалось выполнить анонимный вход:', error)
+      } else if (data?.user) {
+        setAnonymousUser(data.user)
+      }
+    }
+    init()
+  }, [])
 
   // Автоскролл
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatMessages])
 
-  // Подписка на новые сообщения (реальная, после включения Realtime)
+  // Подписка на новые сообщения (Realtime)
   useEffect(() => {
     if (!sessionId) return
     const channel = supabase
@@ -36,24 +50,25 @@ export default function ClientChat() {
   }, [sessionId])
 
   const startChat = async () => {
-    if (!name.trim() || !message.trim()) return
+    if (!name.trim() || !message.trim() || !anonymousUser) return
     setSending(true)
     try {
-      // 1. Пытаемся создать профиль клиента (ошибка не фатальна)
-      let newClient = null
-      try {
-        const res = await supabase.from('profiles').insert({
-          email: `${name.toLowerCase().replace(/\s/g, '.')}@client.test`,
-          display_name: name.trim(),
-          role_id: 6,
-          company_id: 1 // замени на ID своей компании, если нужно
-        }).select().single()
-        newClient = res.data
-      } catch (err) {
-        console.warn('Не удалось создать профиль клиента:', err)
+      const userId = anonymousUser.id
+
+      // 1. Создаём профиль клиента
+      const { error: profileError } = await supabase.from('profiles').insert({
+        user_id: userId,
+        email: `${name.toLowerCase().replace(/\s/g, '.')}@client.test`,
+        display_name: name.trim(),
+        role_id: 6,
+        company_id: 1 // измени на ID своей компании, если не 1
+      })
+      // Профиль может уже существовать — это не критично
+      if (profileError && profileError.code !== '23505') {
+        console.warn('Ошибка создания профиля:', profileError)
       }
 
-      // 2. Создаём сделку и получаем её id
+      // 2. Создаём сделку
       const { data: newDeal, error: dealError } = await supabase
         .from('deals')
         .insert({
@@ -69,12 +84,12 @@ export default function ClientChat() {
         .single()
       if (dealError) throw dealError
 
-      // 3. Создаём чат-сессию, привязываем к сделке
+      // 3. Создаём чат-сессию, привязанную к сделке
       const { data: session, error: sessionError } = await supabase
         .from('chat_sessions')
         .insert({
           company_id: 1,
-          client_id: newClient?.user_id || null,
+          client_id: userId,
           deal_id: newDeal.id,
           status: 'active',
           subject: `Чат: ${name.trim()}`
@@ -83,26 +98,25 @@ export default function ClientChat() {
         .single()
       if (sessionError) throw sessionError
 
-      // 4. Отправляем первое сообщение (оптимистично покажем сразу)
-      if (session) {
-        setSessionId(session.id)
-        const firstMsg = {
-          id: Date.now(),
-          session_id: session.id,
-          sender_type: 'client',
-          message: message.trim(),
-          created_at: new Date().toISOString()
-        }
-        setChatMessages([firstMsg])
-        await supabase.from('chat_messages').insert({
-          session_id: session.id,
-          sender_type: 'client',
-          message: message.trim(),
-          read_status: false
-        })
-        setStep('chat')
-        setMessage('')
+      // 4. Отправляем первое сообщение (оптимистично)
+      setSessionId(session.id)
+      const firstMsg = {
+        id: Date.now(),
+        session_id: session.id,
+        sender_type: 'client',
+        message: message.trim(),
+        created_at: new Date().toISOString()
       }
+      setChatMessages([firstMsg])
+      await supabase.from('chat_messages').insert({
+        session_id: session.id,
+        sender_type: 'client',
+        message: message.trim(),
+        read_status: false
+      })
+
+      setStep('chat')
+      setMessage('')
     } catch (err) {
       console.error('Ошибка создания чата:', err)
       alert('Произошла ошибка, попробуйте позже')
@@ -115,9 +129,9 @@ export default function ClientChat() {
     if (!message.trim() || !sessionId) return
 
     const textToSend = message.trim()
-    setMessage('') // очищаем поле
+    setMessage('')
 
-    // Оптимистично показываем сообщение сразу
+    // Оптимистичное отображение
     const temporaryMessage = {
       id: Date.now(),
       session_id: sessionId,
@@ -127,7 +141,7 @@ export default function ClientChat() {
     }
     setChatMessages(prev => [...prev, temporaryMessage])
 
-    // Отправляем в базу
+    // Отправка в базу
     try {
       const { error } = await supabase.from('chat_messages').insert({
         session_id: sessionId,
@@ -153,7 +167,7 @@ export default function ClientChat() {
             <h2 style={{ color: '#2D6A4F', marginBottom: 24, fontSize: 20 }}>Напишите нам</h2>
             <input style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #E5F0E8', marginBottom: 16, outline: 'none' }} placeholder="Ваше имя" value={name} onChange={e => setName(e.target.value)} />
             <textarea style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #E5F0E8', marginBottom: 24, outline: 'none', resize: 'vertical' }} rows={4} placeholder="Опишите ваш вопрос" value={message} onChange={e => setMessage(e.target.value)} />
-            <button onClick={startChat} disabled={sending} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: '#4CAF6A', color: 'white', fontWeight: 600, cursor: sending ? 'not-allowed' : 'pointer', opacity: sending ? 0.7 : 1 }}>
+            <button onClick={startChat} disabled={sending || !anonymousUser} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: '#4CAF6A', color: 'white', fontWeight: 600, cursor: sending ? 'not-allowed' : 'pointer', opacity: sending || !anonymousUser ? 0.7 : 1 }}>
               {sending ? 'Отправка...' : 'Начать чат'}
             </button>
           </div>
