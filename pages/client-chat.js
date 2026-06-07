@@ -16,7 +16,7 @@ export default function ClientChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatMessages])
 
-  // Подписка на новые сообщения
+  // Подписка на новые сообщения (будет работать после включения Realtime в Supabase)
   useEffect(() => {
     if (!sessionId) return
     const channel = supabase
@@ -39,13 +39,13 @@ export default function ClientChat() {
     if (!name.trim() || !message.trim()) return
     setSending(true)
     try {
-      // 1. Создаём профиль клиента (если возможно)
+      // 1. Создаём профиль клиента (если получится)
       const { data: newClient } = await supabase.from('profiles').insert({
         email: `${name.toLowerCase().replace(/\s/g, '.')}@client.test`,
         display_name: name.trim(),
         role_id: 6,
         company_id: 1
-      }).select().single().catch(() => null) // не фатально, если не вышло
+      }).select().single().catch(() => null)
 
       // 2. Создаём сделку первой и забираем её id
       const { data: newDeal } = await supabase
@@ -77,15 +77,21 @@ export default function ClientChat() {
 
       if (session) {
         setSessionId(session.id)
-        // 4. Отправляем первое сообщение
+        // 4. Отправляем первое сообщение (оптимистично покажем ниже)
+        const firstMsg = {
+          id: Date.now(),
+          session_id: session.id,
+          sender_type: 'client',
+          message: message.trim(),
+          created_at: new Date().toISOString()
+        }
+        setChatMessages([firstMsg])
         await supabase.from('chat_messages').insert({
           session_id: session.id,
           sender_type: 'client',
           message: message.trim(),
           read_status: false
         })
-        const { data: msgs } = await supabase.from('chat_messages').select('*').eq('session_id', session.id).order('created_at', { ascending: true })
-        if (msgs) setChatMessages(msgs)
         setStep('chat')
         setMessage('')
       }
@@ -98,13 +104,32 @@ export default function ClientChat() {
 
   const sendClientMessage = async () => {
     if (!message.trim() || !sessionId) return
-    await supabase.from('chat_messages').insert({
+
+    const textToSend = message.trim()
+    setMessage('') // сразу очищаем поле
+
+    // 1. Оптимистично добавляем сообщение на экран
+    const temporaryMessage = {
+      id: Date.now(), // временный ID, чтобы React не ругался
       session_id: sessionId,
       sender_type: 'client',
-      message: message.trim(),
-      read_status: false
-    })
-    setMessage('')
+      message: textToSend,
+      created_at: new Date().toISOString()
+    }
+    setChatMessages(prev => [...prev, temporaryMessage])
+
+    // 2. Отправляем в Supabase (настоящее сохранение)
+    try {
+      const { error } = await supabase.from('chat_messages').insert({
+        session_id: sessionId,
+        sender_type: 'client',
+        message: textToSend,
+        read_status: false
+      })
+      if (error) console.error('Ошибка при отправке в БД:', error)
+    } catch (err) {
+      console.error('Непредвиденная ошибка отправки:', err)
+    }
   }
 
   return (
