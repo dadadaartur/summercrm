@@ -392,19 +392,30 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="metrics-widget">
-        <div className="metrics-widget-item">
-          <div className="metrics-widget-value">{metrics.openDeals}</div>
-          <div className="metrics-widget-label">открытых сделок</div>
-        </div>
-        <div className="metrics-widget-item">
-          <div className="metrics-widget-value">{metrics.activeGoals}</div>
-          <div className="metrics-widget-label">активных целей</div>
-        </div>
-      </div>
+      {/* Виджет метрик удалён отсюда, он теперь внутри левой панели */}
 
       <div className="chat-container">
         <div className="chat-left-panel">
+          {/* Блок метрик внутри левой панели */}
+          <div style={{
+            background: '#F2F9F4',
+            borderRadius: '16px',
+            padding: '16px',
+            display: 'flex',
+            gap: '16px',
+            marginBottom: '16px',
+            border: '1px solid #E5F0E8'
+          }}>
+            <div style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#4CAF6A' }}>{metrics.openDeals}</div>
+              <div style={{ fontSize: '11px', color: '#5B7465' }}>открытых сделок</div>
+            </div>
+            <div style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#4CAF6A' }}>{metrics.activeGoals}</div>
+              <div style={{ fontSize: '11px', color: '#5B7465' }}>активных целей</div>
+            </div>
+          </div>
+
           <div className="chat-client-header">
             <div className="chat-client-avatar">
               {client.name.charAt(0).toUpperCase()}
