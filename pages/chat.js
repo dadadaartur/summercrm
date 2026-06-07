@@ -54,7 +54,7 @@ export default function ChatPage() {
     deadline: '',
     responsible_user_id: ''
   })
-  const [dealId, setDealId] = useState(null)  // ID привязанной сделки
+  const [dealId, setDealId] = useState(null)
 
   const showNotification = (msg) => {
     setNotification({ show: true, message: msg })
@@ -88,7 +88,6 @@ export default function ChatPage() {
           setOperatorAvgRating(avg.toFixed(1))
         }
 
-        // Определяем сессию: либо по sessionId в URL, либо по dealId
         const sid = router.query.sessionId
         const did = router.query.dealId
 
@@ -103,7 +102,6 @@ export default function ChatPage() {
               operator_message_count: sess.operator_message_count || 0,
               auto_rating: sess.auto_rating
             })
-            // Загружаем данные клиента
             if (sess.client_id) {
               const { data: cl } = await supabase.from('profiles').select('user_id, email, display_name').eq('user_id', sess.client_id).maybeSingle()
               if (cl) setClient({ id: cl.user_id, name: cl.display_name || cl.email, email: cl.email, phone: '', status: 'клиент', priority: 'medium' })
@@ -111,12 +109,10 @@ export default function ChatPage() {
             await loadMessages(sid)
           }
         } else if (did) {
-          // Найти сессию по сделке
           const { data: sess } = await supabase.from('chat_sessions').select('*').eq('deal_id', did).maybeSingle()
           if (sess) {
             router.replace(`/chat?sessionId=${sess.id}`)
           } else {
-            // Создать новую сессию для сделки
             const { data: deal } = await supabase.from('deals').select('*').eq('id', did).single()
             if (deal) {
               const { data: newSess } = await supabase.from('chat_sessions').insert({
@@ -216,7 +212,6 @@ export default function ChatPage() {
     refreshSessionStats()
   }
 
-  // Обновление сделки из модального окна
   const handleUpdateDeal = async () => {
     if (!dealId) return
     const { error } = await supabase.from('deals').update({
@@ -235,7 +230,6 @@ export default function ChatPage() {
   }
 
   const createDealFromChat = () => {
-    // Открываем модальное окно заполнения сделки
     setShowDealModal(true)
   }
 
@@ -261,13 +255,22 @@ export default function ChatPage() {
         <div className="topbar-right"><span className="topbar-name">{user?.email}</span></div>
       </div>
 
-      <div className="metrics-widget">
-        <div className="metrics-widget-item"><div className="metrics-widget-value">{metrics.openDeals}</div><div className="metrics-widget-label">открытых сделок</div></div>
-        <div className="metrics-widget-item"><div className="metrics-widget-value">{metrics.activeGoals}</div><div className="metrics-widget-label">активных целей</div></div>
-      </div>
+      {/* Виджет метрик больше не отображается отдельно — он внутри левой панели */}
 
       <div className="chat-container">
         <div className="chat-left-panel">
+          {/* Блок метрик */}
+          <div style={{ background: '#F2F9F4', borderRadius: '16px', padding: '16px', display: 'flex', gap: '16px', marginBottom: '16px', border: '1px solid #E5F0E8' }}>
+            <div style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#4CAF6A' }}>{metrics.openDeals}</div>
+              <div style={{ fontSize: '11px', color: '#5B7465' }}>открытых сделок</div>
+            </div>
+            <div style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#4CAF6A' }}>{metrics.activeGoals}</div>
+              <div style={{ fontSize: '11px', color: '#5B7465' }}>активных целей</div>
+            </div>
+          </div>
+
           <div className="chat-client-header">
             <div className="chat-client-avatar">{client.name.charAt(0).toUpperCase()}</div>
             <div className="chat-client-info"><div className="chat-client-name">{client.name}</div><div className="chat-client-status">{client.status}</div></div>
