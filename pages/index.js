@@ -79,7 +79,6 @@ export default function CRM() {
 
   const loadAll = async (userId) => {
     try {
-      // Профиль
       const { data: profileData } = await supabase
         .from('profiles')
         .select('first_name, last_name, avatar_url, position_id, positions(title)')
@@ -90,7 +89,6 @@ export default function CRM() {
       setProfile(profileData)
       const companyId = profileData.company_id
 
-      // Параллельные запросы
       const [
         { data: balanceData },
         { data: taskAssignments },
@@ -109,16 +107,12 @@ export default function CRM() {
       if (taskAssignments) setTasks(taskAssignments)
       if (goalsData) setGoals(goalsData)
 
-      // Воронка: группируем по статусам
       if (dealsData) {
         const stats = { new: 0, qualification: 0, proposal: 0, negotiation: 0, won: 0 }
-        dealsData.forEach(d => {
-          if (stats.hasOwnProperty(d.status)) stats[d.status]++
-        })
+        dealsData.forEach(d => { if (stats.hasOwnProperty(d.status)) stats[d.status]++ })
         setFunnel(stats)
       }
 
-      // Счётчик активных чатов
       setActiveChats(chatCount || 0)
 
       const savedCalls = localStorage.getItem(`crm_calls_${userId}`)
@@ -134,7 +128,61 @@ export default function CRM() {
     }
   }
 
-  // ... (useEffect для облаков, addProgress, addCall остаются без изменений)
+  useEffect(() => {
+    if (!windActive) return
+    const timer = setTimeout(() => setWindActive(false), 20000)
+    return () => clearTimeout(timer)
+  }, [windActive])
+
+  useEffect(() => {
+    if (windActive) return
+    const interval = setInterval(() => setWindActive(true), 10 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [windActive])
+
+  // ===== Функции addProgress и addCall (обязательно) =====
+  const addProgress = async (goalId, currentVal) => {
+    const newVal = currentVal + 1
+    const goal = goals.find(g => g.id === goalId)
+    if (!goal || newVal > goal.target_value) return
+
+    const updates = { current_value: newVal, updated_at: new Date().toISOString() }
+    if (newVal >= goal.target_value) {
+      updates.is_active = false
+      if (goal.reward_karma > 0) {
+        await supabase.from('karma_transactions').insert({
+          user_id: user.id, amount: goal.reward_karma, type: 'goal_reward',
+          description: `Достижение цели: ${goal.title}`
+        })
+        const { data: bal } = await supabase.from('karma_balance').select('balance').eq('user_id', user.id).single()
+        if (bal) await supabase.from('karma_balance').update({ balance: bal.balance + goal.reward_karma }).eq('user_id', user.id)
+      }
+    }
+    const { error } = await supabase.from('goals').update(updates).eq('id', goalId)
+    if (!error) {
+      setGoals(prev => prev.map(g => g.id === goalId ? { ...g, ...updates } : g).filter(g => g.is_active))
+      if (updates.is_active === false) alert('Цель достигнута! Награда начислена.')
+    }
+  }
+
+  const addCall = async () => {
+    const newCalls = calls + 1
+    setCalls(newCalls)
+    localStorage.setItem(`crm_calls_${user.id}`, newCalls.toString())
+    for (const goal of goals.filter(g => g.goal_type === 'calls' && g.is_active)) {
+      if (newCalls > goal.current_value) {
+        await addProgress(goal.id, goal.current_value)
+      }
+    }
+    for (const assignment of tasks) {
+      const t = assignment.tasks
+      if (t && t.crm_action_type === 'call' && newCalls >= t.crm_target_count) {
+        await supabase.from('task_assignments').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', assignment.id)
+      }
+    }
+    const { data: updatedAssignments } = await supabase.from('task_assignments').select('id, status, task_id, tasks(id, title, reward_karma, crm_action_type, crm_target_count)').eq('user_id', user.id).eq('status', 'in_progress').eq('tasks.task_type', 'auto_crm')
+    if (updatedAssignments) setTasks(updatedAssignments)
+  }
 
   const handleCreateDeal = async () => {
     if (!newDeal.title.trim()) return
@@ -287,7 +335,6 @@ export default function CRM() {
               </div>
             )}
 
-            {/* Реальная воронка */}
             <div className="panel">
               <h3>Воронка продаж</h3>
               <div className="funnel-stage"><span className="stage-name">Новые</span><div className="stage-bar"><div className="stage-fill" style={{width: `${(funnel.new / Math.max(1, Object.values(funnel).reduce((a,b)=>a+b))) * 100}%`}}></div></div><span className="stage-count">{funnel.new} сделок</span></div>
