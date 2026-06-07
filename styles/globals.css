@@ -2,7 +2,26 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+html, body, div, span, p, h1, h2, h3, h4, h5, h6, a, button, svg,
+li, ul, ol, table, tr, td, th, section, header, footer, nav, aside,
+main, article, form, label, input[type="checkbox"], input[type="radio"],
+select, option, textarea, [contenteditable="false"] {
   cursor: default !important;
+}
+
+input[type="text"], input[type="email"], input[type="password"],
+input[type="number"], input[type="search"], input[type="tel"],
+input[type="url"], textarea, [contenteditable="true"] {
+  cursor: text !important;
+}
+
+a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link,
+.quick-templates-btn, .chat-send-btn, .deal-card, .modal-overlay,
+.chat-load-more, .chat-tab, .chat-template-btn, .chat-action-btn,
+.quick-template-btn, .hotkey-item {
+  cursor: pointer !important;
 }
 
 html, body {
@@ -13,14 +32,6 @@ html, body {
   color: #1F2E23;
   min-height: 100vh;
   overflow-x: hidden;
-}
-
-input, textarea, [contenteditable="true"] {
-  cursor: text !important;
-}
-
-a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link, .quick-templates-btn {
-  cursor: pointer !important;
 }
 
 /* Верхняя панель */
@@ -333,7 +344,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link, .quick-template
   100% { transform: rotate(10deg); }
 }
 
-/* ========== СТИЛИ ДЛЯ ЧАТА ========== */
+/* ========== СТИЛИ ДЛЯ ЧАТА (исправленные) ========== */
 .chat-container {
   display: flex;
   height: calc(100vh - 48px);
@@ -628,7 +639,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link, .quick-template
   box-shadow: none;
 }
 
-/* Кнопка быстрых ответов (иконка молнии) */
+/* Кнопка быстрых ответов */
 .quick-templates-btn {
   background: transparent;
   border: 1px solid #E5F0E8;
@@ -648,7 +659,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link, .quick-template
   border-color: #F4B860;
 }
 
-/* Панель быстрых шаблонов (появляется над полем ввода) */
+/* Панель быстрых шаблонов */
 .quick-templates-panel {
   position: absolute;
   bottom: 80px;
@@ -679,9 +690,7 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link, .quick-template
   transition: all 0.2s;
 }
 
-.quick-template-btn:hover {
-  background: #E5F0E8;
-}
+.quick-template-btn:hover { background: #E5F0E8; }
 
 .typing-indicator {
   font-size: 12px;
@@ -707,5 +716,5 @@ a, button, .action-btn, .wind-btn, .topbar-logo-link, .nav-link, .quick-template
   .deal-card { min-width: auto; width: calc(100% - 32px); }
   .chat-container { flex-direction: column; }
   .chat-left-panel, .chat-right-panel { width: 100%; min-width: auto; height: auto; }
-  .chat-right-panel { border-left: none; border-top: 1px solid #E5F0E8; }
+  .chat-right-panel { display: none; }
 }
